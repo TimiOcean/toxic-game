@@ -1,0 +1,48 @@
+---
+description: Toxic Game — gameplay mechanics and LED feedback
+alwaysApply: true
+---
+
+# Gameplay
+
+A song plays over audio. Players press their buttons on beat. Which beats require input is defined per song (tap notes) and communicated visually on the LED strip.
+
+## Beat Input & Scoring
+
+Two judgement tiers (windows from `toxic_game.toml`):
+
+| Result | Timing | Health | LED |
+|--------|--------|--------|-----|
+| **Perfect** | within ±20 ms of beat | +2 | white flash at player's end |
+| **Good** | within ±50 ms (outside perfect) | +1 | white flash at player's end |
+| **Error** | miss, or press outside good window | −2 | red flash at player's end |
+
+- Shared health pool starts at **20**, capped at **20**; at **0** → game over
+- Both players can have notes on the **same beat** — evaluated independently; two running lights may be active simultaneously
+- Ghost taps (no active note) are ignored
+
+## Player 1 (Left Side)
+
+- Notes spawn as a **magenta running light** on the **right end** of the LED strip
+- Light travels **right → left**
+- Player must press when the light reaches the **left end** of the strip
+- Light starts **dark** and **brightens** as it approaches the left end
+
+## Player 2 (Right Side)
+
+- **Mirror of Player 1:** note spawns as a **cyan running light** on the **left end** of the strip
+- Light travels **left → right**
+- Player must press when the light reaches the **right end** of the strip
+- Same brightness ramp: starts dark, brightens as it approaches the hit end
+
+## LED Strip Layout
+
+- Single continuous strip; index 0 = **left end** (Player 1 hit zone), last index = **right end** (Player 2 hit zone)
+- Running lights spawn **4 beats (1 bar)** before the hit beat (`lead_time_beats` in config)
+- Running lights communicate upcoming notes; end flashes communicate hit/miss feedback
+
+## Timing Concepts
+
+- Songs have: **BPM**, **delay to first beat**, and per-beat **tap note** markers (`bar.beat` text files)
+- Tap notes quantized to **quarter notes (4ths)** during recording
+- All numeric tuning in **`toxic_game.toml`** — see `config.mdc`

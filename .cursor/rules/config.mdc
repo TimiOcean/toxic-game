@@ -1,0 +1,71 @@
+---
+description: Toxic Game — single TOML config for all numeric parameters
+alwaysApply: true
+---
+
+# Configuration
+
+**All numeric parameters live in one file:** `toxic_game.toml` at the repo root. No magic numbers in code — read from config.
+
+Per-song data (BPM, delay, audio path, name) lives in `songs/<song_id>/song.toml`. Tap notes are separate text files in the same folder.
+
+## `toxic_game.toml` (global)
+
+```toml
+[paths]
+songs_dir = "songs"
+
+[gpio]
+left_contact_pin = 17
+right_contact_pin = 27
+
+[led]
+count = 60
+pin = 18
+freq_hz = 800000
+dma = 10
+invert = false
+brightness = 255
+channel = 0
+hit_flash_ms = 180        # white/red flash duration at strip end
+running_light_span = 4    # LEDs per traveling note (prototype default)
+
+[gameplay]
+lead_time_beats = 4       # running light spawns 1 bar (4 beats) before hit
+
+[gameplay.judgement_windows_ms]
+perfect = 20              # ±20 ms from beat
+good = 50                 # ±50 ms from beat (must be >= perfect)
+
+[gameplay.health]
+start = 20
+max = 20                  # cap regen at start value
+lose_on_error = 2
+gain_on_good = 1
+gain_on_perfect = 2
+
+[runtime]
+update_hz = 60            # game loop target rate
+```
+
+## Assumptions (change in config if needed)
+
+- Judgement: **perfect** is the tighter window (20 ms); **good** is wider (50 ms)
+- Health regen cannot exceed `max` (= `start`)
+- Ghost taps (press with no active note) are ignored — no health change
+- GPIO/LED defaults match `/home/pi/rythm-jump/rythm_jump.toml` until hardware differs
+
+## `songs/<song_id>/song.toml` (per song)
+
+```toml
+name = "Song Title"
+audio = "audio.mp3"
+bpm = 120.0
+delay_to_first_beat_ms = 0
+```
+
+## Tap note files (per song)
+
+- `p1.taps` — Player 1 (left), one `bar.beat` per line (1-based)
+- `p2.taps` — Player 2 (right), same format
+- Quantize to nearest quarter note when recording

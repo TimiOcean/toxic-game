@@ -1,0 +1,52 @@
+---
+description: Toxic Game — hardware wiring and prototype reference
+alwaysApply: true
+---
+
+# Hardware Reference
+
+Use `/home/pi/rythm-jump` as the canonical reference for Raspberry Pi hardware communication. Adapt pin counts and patterns to Toxic Game's single-strip, two-end layout.
+
+## Prototype Defaults (`rythm_jump.toml`)
+
+```toml
+[gpio]
+left_contact_pin = 17
+right_contact_pin = 27
+
+[led]
+count = 60
+pin = 18
+freq_hz = 800000
+dma = 10
+invert = false
+brightness = 255
+channel = 0
+```
+
+## Wiring (from prototype README)
+
+- **LED strip:** WS2811, 5V/12V/24V; data via level shifter (74AHCT125), ~220–249Ω series resistor, 1000µF cap on power
+- **Buttons:** Momentary contact switches with 10kΩ pull-up; read as active-low on GPIO
+- **Power:** Buck converter from 24V rail; watch for undervoltage on Pi
+
+## Prototype Code to Reuse / Study
+
+| Concern | Path |
+|---------|------|
+| GPIO input | `rythm_jump/hw/gpio_input.py` |
+| LED output | `rythm_jump/hw/led_output.py` |
+| LED frame building | `rythm_jump/engine/led_frames.py` |
+| Hardware config | `rythm_jump/config.py` |
+| Debug CLI | `rythm_jump/cli.py` (`rj-debug gpio`, `rj-debug led`) |
+
+## Toxic Game Differences from Prototype
+
+- Prototype splits strip into **left/right halves** for two lanes; Toxic Game uses **ends of one strip** for two players with traveling lights
+- Prototype uses JSON charts; Toxic Game uses **plain-text tap note files** + separate song config
+- Prototype has a web UI; Toxic Game is **headless** (admin tools are CLI or separate scripts)
+
+## Dev Without Hardware
+
+- GPIO: return `False` when `RPi.GPIO` unavailable (prototype pattern)
+- LED: `NoOpLedOutput` / `SimLedOutput` for tests (prototype pattern)

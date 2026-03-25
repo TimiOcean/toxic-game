@@ -1,0 +1,34 @@
+---
+description: Toxic Game — project overview, platform, and constraints
+alwaysApply: true
+---
+
+# Toxic Game — Project Overview
+
+Cooperative two-player rhythm game for Raspberry Pi. Python implementation. **Do not start implementation until explicitly requested** — rules and design come first.
+
+## Target Hardware
+
+- **Controller:** Raspberry Pi 3 Model B v1.2 (2025)
+- **Inputs:** Two hardware buttons (one per player)
+- **Outputs:** Audio playback, WS2811 LED strip
+- **Reference prototype:** `/home/pi/rythm-jump` — reuse its GPIO/LED patterns and hardware adapters as the starting point for physical I/O
+
+## Language & Tooling
+
+- **Language:** Python
+- **Dependency management:** Prefer `uv` (match prototype conventions where sensible)
+- **Physical I/O libraries (from prototype):** `RPi.GPIO` for buttons, `rpi_ws281x` for LED strip
+- **Config:** `toxic_game.toml` — single file for all global numeric parameters (hardware + gameplay); per-song `song.toml` under `songs/<id>/`
+- **Audio:** pygame mixer (same approach as prototype)
+
+## Players & Cooperation
+
+- Two players, one button each
+- **Single shared health pool** — mistakes by either player drain the same health
+- Health at 0 → game over
+
+## Out of Scope (for now)
+
+- No web UI unless later specified
+- No implementation work unless explicitly requested

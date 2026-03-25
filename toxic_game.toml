@@ -1,0 +1,34 @@
+[paths]
+songs_dir = "songs"
+
+[gpio]
+left_contact_pin = 17
+right_contact_pin = 27
+
+[led]
+count = 60
+pin = 18
+freq_hz = 800000
+dma = 10
+invert = false
+brightness = 255
+channel = 0
+hit_flash_ms = 180
+running_light_span = 4
+
+[gameplay]
+lead_time_beats = 4
+
+[gameplay.judgement_windows_ms]
+perfect = 20
+good = 50
+
+[gameplay.health]
+start = 20
+max = 20
+lose_on_error = 2
+gain_on_good = 1
+gain_on_perfect = 2
+
+[runtime]
+update_hz = 60

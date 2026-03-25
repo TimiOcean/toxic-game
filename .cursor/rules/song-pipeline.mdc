@@ -1,0 +1,47 @@
+---
+description: Toxic Game — song configuration and tap note authoring
+alwaysApply: true
+---
+
+# Song Pipeline (Authoring → Gameplay)
+
+Songs are prepared offline, then loaded read-only at runtime.
+
+## Song Configuration
+
+Admin tool fields:
+
+| Field | Purpose |
+|-------|---------|
+| Audio file | Sound played during gameplay and tap recording |
+| Song name | Identifier / display name |
+| BPM | Beats per minute for beat/bar calculation |
+| Delay to first beat | Offset from audio start to beat 0 |
+
+Output: **TOML** song metadata consumed by Song Manager (alongside audio file).
+
+## Tap Notes
+
+- **Tap note** = a beat index (or time) where a player must press
+- Stored as a **plain text file** (one marker per required jump)
+- **Per-player files:** `p1.taps` (left), `p2.taps` (right) in the song folder
+- Format: **`bar.beat` notation** (e.g. `3.2` = bar 3, beat 2; one note per line)
+- Quantized to **quarter notes (4ths)** when recorded live
+- Editable manually after recording
+
+### Tap Recording Workflow
+
+1. Load song config (audio + BPM + first-beat delay)
+2. Play audio; operator presses buttons at intended beats
+3. Raw press times → quantize to nearest 4th
+4. Write/update tap note text file
+5. Operator may fine-tune in a text editor
+
+## Runtime Loading
+
+- Global: `toxic_game.toml` (hardware, gameplay numbers, paths)
+- Per song: `songs/<song_id>/song.toml` + `p1.taps` + `p2.taps` + audio file
+
+## Reference (different format)
+
+Prototype uses `songs/<id>/chart.json` with `left`/`right` hit time lists in milliseconds. Toxic Game replaces this with simpler text tap notes — do not copy the JSON schema unless we explicitly converge.

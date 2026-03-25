@@ -1,0 +1,65 @@
+---
+description: Toxic Game — module architecture and responsibilities
+alwaysApply: true
+---
+
+# Architecture
+
+Headless Python game loop. Separate admin/offline tools for song authoring. Keep hardware adapters isolated from game logic (follow prototype pattern: `hw/` vs `engine/`).
+
+## Core Runtime Modules
+
+### Game Manager
+- Owns the main **update loop** at `runtime.update_hz` from config (default 60 Hz)
+- Holds **game state**: health, active notes, hit/miss results, game-over
+- Loads all numeric tuning from `toxic_game.toml` — never hardcode gameplay constants
+- Orchestrates other managers each frame: poll inputs → advance song time → evaluate hits → update LEDs
+- Does **not** talk to hardware directly — delegates to managers
+
+### Song Manager
+- Plays the audio file
+- Exposes **current playback position** and, on request, **current beat** and **bar**
+- Beat/bar derived from song config: BPM + delay-to-first-beat + elapsed playback time
+- Single source of truth for musical time during gameplay
+
+### Button Manager
+- Returns whether each button was **pressed since the last frame** (edge-triggered, not held state)
+- Abstracts GPIO; provide no-op / simulated implementation for dev without hardware
+- Reference: `/home/pi/rythm-jump/rythm_jump/hw/gpio_input.py`
+
+### LED Manager
+- Renders visuals to the LED strip each frame
+- Running lights, brightness ramp, white/red hit flashes
+- Abstracts `rpi_ws281x`; provide no-op / in-memory implementation for tests
+- Reference: `/home/pi/rythm-jump/rythm_jump/hw/led_output.py`, `engine/led_frames.py`
+
+## Offline / Admin Modules
+
+### Song Configuration (admin tool)
+- Run **outside** the game loop
+- Inputs: audio file, song name, BPM, delay to first beat
+- Produces a song package usable by Song Manager and tap recording
+- Not part of the runtime game binary/process
+
+### Tap Recording (admin tool)
+- Run **outside** the game loop (or in a dedicated recording mode)
+- Plays the song; operator presses buttons at intended beats
+- Records inputs, **quantizes to quarter notes (4ths)**
+- Output: **tap note file** — plain text, one marker per beat where a player must jump
+- File is **human-editable** in a text editor after recording
+
+## Data Flow (runtime)
+
+```
+Song Manager (time/beat) ──► Game Manager ◄── Button Manager (presses)
+                                    │
+                                    ▼
+                              LED Manager (frame)
+```
+
+## Design Principles
+
+- Managers are **thin adapters** or **focused domain logic** — avoid a god object
+- Song data (config + tap notes) is **read-only** during gameplay
+- Prefer explicit types and testable pure functions for timing/scoring math
+- Reuse proven hardware patterns from `rythm-jump` rather than reinventing GPIO/LED glue
