@@ -8,12 +8,14 @@ dependencies = []
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
-    "ruff>=0.15.4",
 ]
 pi = [
     "pygame>=2.6.1",
     "rpi-ws281x>=5.0.0",
 ]
+
+[project.scripts]
+tg-led = "toxic_game.tools.led_check:main"
 
 [build-system]
 requires = ["hatchling>=1.25.0"]
@@ -21,14 +23,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["toxic_game"]
-
-[tool.ruff]
-line-length = 88
-
-[tool.ruff.lint]
-select = ["ALL"]
-ignore = ["D203", "D213"]
-per-file-ignores = { "tests/*.py" = ["S101", "D100", "D103", "D104", "PLR2004", "TC003"] }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

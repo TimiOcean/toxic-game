@@ -2,7 +2,6 @@ __pycache__/
 *.pyc
 .venv/
 .pytest_cache/
-.ruff_cache/
 .cursor/plans/
 
 # Song content is added via admin tools

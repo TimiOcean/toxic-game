@@ -17,9 +17,21 @@ All global numeric settings live in [`toxic_game.toml`](toxic_game.toml) (GPIO, 
 
 ```bash
 uv run pytest -q
-uv run ruff check .
-uv run ruff format .
 ```
+
+## LED hardware check (Phase 1)
+
+On the Pi (requires `uv sync --group pi` and usually `sudo` for GPIO DMA):
+
+```bash
+uv run tg-led --pattern solid --color magenta
+uv run tg-led --pattern walk --color white
+uv run tg-led --pattern dual-chase
+uv run tg-led --pattern flash --side left --color white
+uv run tg-led --pattern flash --side right --color red
+```
+
+Index 0 is the **left** end (Player 1). Patterns end by clearing the strip.
 
 ## Hardware reference
 
