@@ -46,10 +46,7 @@ class LedConfig:
     channel: int
     hit_flash_ms: int
     running_light_span: int
-    muted_rgb_byte_order: str
     rgbw_byte_order: str
-    muted_rgb_strip_type: str
-    rgbw_strip_type: str
 
     @property
     def total_count(self) -> int:
@@ -60,6 +57,19 @@ class LedConfig:
     def active_count(self) -> int:
         """Gameplay LEDs (RGBW segment only)."""
         return self.rgbw_count
+
+    @property
+    def muted_rgbw_count(self) -> int:
+        """Black RGBW driver pixels clocking through the leading RGB segment."""
+        if self.muted_rgb_count == 0:
+            return 0
+        rgb_bytes = self.muted_rgb_count * 3
+        return (rgb_bytes + 3) // 4
+
+    @property
+    def driver_count(self) -> int:
+        """Uniform RGBW pixels passed to rpi_ws281x."""
+        return self.muted_rgbw_count + self.rgbw_count
 
 
 @dataclass(frozen=True, slots=True)
@@ -207,12 +217,7 @@ def _build_led_config(led_table: dict[str, object]) -> LedConfig:
         channel=_read_int(led_table, "channel", 0),
         hit_flash_ms=_read_int(led_table, "hit_flash_ms", 180),
         running_light_span=_read_int(led_table, "running_light_span", 4),
-        muted_rgb_byte_order=_read_str(led_table, "muted_rgb_byte_order", "GRB"),
         rgbw_byte_order=_read_str(led_table, "rgbw_byte_order", "WRGB"),
-        muted_rgb_strip_type=_read_str(
-            led_table, "muted_rgb_strip_type", "WS2811_STRIP_GRB"
-        ),
-        rgbw_strip_type=_read_str(led_table, "rgbw_strip_type", "SK6812_STRIP_GRBW"),
     )
 
 

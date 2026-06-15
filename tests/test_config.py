@@ -20,11 +20,12 @@ def test_load_default_config() -> None:
     assert config.gpio.left_contact_pin == 17
     assert config.gpio.right_contact_pin == 27
     assert config.led.muted_rgb_count == 60
-    assert config.led.rgbw_count == 60
-    assert config.led.total_count == 120
-    assert config.led.active_count == 60
+    assert config.led.rgbw_count == 20
+    assert config.led.muted_rgbw_count == 45
+    assert config.led.driver_count == 65
+    assert config.led.total_count == 80
+    assert config.led.active_count == 20
     assert config.led.rgbw_byte_order == "WRGB"
-    assert config.led.muted_rgb_byte_order == "GRB"
     assert config.led.hit_flash_ms == 180
     assert config.led.running_light_span == 4
     assert config.gameplay.lead_time_beats == 4

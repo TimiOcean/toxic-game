@@ -65,9 +65,11 @@ def run_led_check(
     color = NAMED_COLORS[options.color_name]
     output: FrameWriter = writer or Ws2811LedOutput()
     stdout(
-        "Driving WS2811 output "
+        "Driving RGBW output "
         f"(muted_rgb={led_config.muted_rgb_count}, "
-        f"rgbw={led_config.rgbw_count}, pin={led_config.pin}, "
+        f"muted_rgbw={led_config.muted_rgbw_count}, "
+        f"rgbw={led_config.rgbw_count}, "
+        f"driver={led_config.driver_count}, pin={led_config.pin}, "
         f"pattern={options.pattern}, color={options.color_name})\n",
     )
 

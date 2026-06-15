@@ -71,6 +71,22 @@ def test_dual_chase_includes_both_colors() -> None:
     assert any(pixels[count] != OFF for count in range(len(pixels)))
 
 
+def test_dual_chase_hw_pattern_uses_full_brightness() -> None:
+    from toxic_game.hw.led_patterns import pattern_frames
+
+    frames = pattern_frames(
+        pattern="dual-chase",
+        count=10,
+        span=1,
+        color=MAGENTA,
+    )
+    dim = dual_chase_pixels(count=10, step=0, span=1, brightness_ramp=True)
+    bright = dual_chase_pixels(count=10, step=0, span=1, brightness_ramp=False)
+
+    assert frames[0].pixels == bright
+    assert sum(bright[-1]) > sum(dim[-1])
+
+
 def test_end_flash_left_and_right() -> None:
     left = end_flash_pixels(8, "left", WHITE)
     right = end_flash_pixels(8, "right", MAGENTA)

@@ -5,25 +5,25 @@ from __future__ import annotations
 import importlib
 from typing import Protocol, cast
 
-from toxic_game.config import LedConfig, build_led_config
+from toxic_game.config import build_led_config
 from toxic_game.engine.led_frames import LedFrame, RgbPixel
-from toxic_game.hw.strip_types import resolve_strip_type
-from toxic_game.hw.wire_encoding import (
-    build_mixed_wire_buffer,
-    logical_pixel_count,
-    wire_bytes_to_rgb_colors,
-)
+from toxic_game.hw.rgbw_color import rgbw_color_args
+from toxic_game.hw.strip_types import resolve_rgbw_strip_type
 
 
-def map_logical_frame_to_physical(
+def build_driver_pixels(
     frame: LedFrame,
     *,
-    muted_rgb_count: int,
+    muted_rgbw_count: int,
     rgbw_count: int,
 ) -> tuple[RgbPixel, ...]:
-    """Map a logical RGBW frame onto the active strip segment."""
-    _ = muted_rgb_count
-    return frame.pixels[:rgbw_count]
+    """Build the uniform RGBW buffer sent to rpi_ws281x.
+
+    Leading black pixels clock through the physical RGB-only segment; gameplay
+    pixels follow on the RGBW segment.
+    """
+    muted = ((0, 0, 0),) * muted_rgbw_count
+    return muted + frame.pixels[:rgbw_count]
 
 
 class PixelStripProtocol(Protocol):
@@ -93,32 +93,19 @@ class Ws2811LedOutput:
             return None
 
         config = build_led_config()
-        strip_count, strip_type = self._strip_layout(config)
 
         strip = strip_class(
-            strip_count,
+            config.driver_count,
             config.pin,
             config.freq_hz,
             config.dma,
             config.invert,
             config.brightness,
             config.channel,
-            strip_type=strip_type,
+            strip_type=resolve_rgbw_strip_type(config.rgbw_byte_order),
         )
         strip.begin()
         return cast("PixelStripProtocol", strip)
-
-    @staticmethod
-    def _strip_layout(config: LedConfig) -> tuple[int, int]:
-        if config.muted_rgb_count == 0:
-            return config.rgbw_count, resolve_strip_type(config.rgbw_strip_type)
-        return (
-            logical_pixel_count(
-                muted_rgb_count=config.muted_rgb_count,
-                rgbw_count=config.rgbw_count,
-            ),
-            resolve_strip_type(config.muted_rgb_strip_type),
-        )
 
     def write_frame(self, frame: LedFrame) -> None:
         """Push the current frame to the physical strip."""
@@ -126,29 +113,22 @@ class Ws2811LedOutput:
             return
 
         config = build_led_config()
-        active_pixels = map_logical_frame_to_physical(
+        pixels = build_driver_pixels(
             frame,
-            muted_rgb_count=config.muted_rgb_count,
+            muted_rgbw_count=config.muted_rgbw_count,
             rgbw_count=config.rgbw_count,
         )
 
-        if config.muted_rgb_count == 0:
-            for index, (red, green, blue) in enumerate(active_pixels):
-                self._strip.setPixelColor(
-                    index,
-                    self._color_factory(red, green, blue, 0),
-                )
-        else:
-            wire = build_mixed_wire_buffer(
-                muted_rgb_count=config.muted_rgb_count,
-                active_pixels=active_pixels,
-                muted_rgb_byte_order=config.muted_rgb_byte_order,
-                rgbw_byte_order=config.rgbw_byte_order,
+        for index, (red, green, blue) in enumerate(pixels):
+            color_args = rgbw_color_args(
+                red,
+                green,
+                blue,
+                byte_order=config.rgbw_byte_order,
             )
-            for index, (red, green, blue) in enumerate(wire_bytes_to_rgb_colors(wire)):
-                self._strip.setPixelColor(
-                    index,
-                    self._color_factory(red, green, blue),
-                )
+            self._strip.setPixelColor(
+                index,
+                self._color_factory(*color_args),
+            )
 
         self._strip.show()

@@ -37,6 +37,7 @@ def _place_span(
     span: int,
     color: RgbPixel,
     travel_right_to_left: bool,
+    brightness_ramp: bool,
 ) -> None:
     count = len(pixels)
     if span <= 0 or count == 0:
@@ -51,7 +52,10 @@ def _place_span(
         end = min(head_index + span - 1, count - 1)
         progress = head_index / max(count - 1, 1)
 
-    brightness = 0.15 + 0.85 * min(max(progress, 0.0), 1.0)
+    if brightness_ramp:
+        brightness = 0.15 + 0.85 * min(max(progress, 0.0), 1.0)
+    else:
+        brightness = 1.0
     lit = scale_pixel(color, brightness)
     for index in range(start, end + 1):
         pixels[index] = lit
@@ -61,6 +65,8 @@ def player1_chase_pixels(
     count: int,
     step: int,
     span: int,
+    *,
+    brightness_ramp: bool = True,
 ) -> tuple[RgbPixel, ...]:
     """Magenta running light traveling right to left."""
     pixels = blank_pixels(count)
@@ -71,6 +77,7 @@ def player1_chase_pixels(
         span=span,
         color=MAGENTA,
         travel_right_to_left=True,
+        brightness_ramp=brightness_ramp,
     )
     return tuple(pixels)
 
@@ -79,6 +86,8 @@ def player2_chase_pixels(
     count: int,
     step: int,
     span: int,
+    *,
+    brightness_ramp: bool = True,
 ) -> tuple[RgbPixel, ...]:
     """Cyan running light traveling left to right."""
     pixels = blank_pixels(count)
@@ -89,6 +98,7 @@ def player2_chase_pixels(
         span=span,
         color=CYAN,
         travel_right_to_left=False,
+        brightness_ramp=brightness_ramp,
     )
     return tuple(pixels)
 
@@ -97,10 +107,16 @@ def dual_chase_pixels(
     count: int,
     step: int,
     span: int,
+    *,
+    brightness_ramp: bool = True,
 ) -> tuple[RgbPixel, ...]:
     """Both player chase lights on one strip."""
-    pixels = list(player1_chase_pixels(count, step, span))
-    for index, color in enumerate(player2_chase_pixels(count, step, span)):
+    pixels = list(
+        player1_chase_pixels(count, step, span, brightness_ramp=brightness_ramp),
+    )
+    for index, color in enumerate(
+        player2_chase_pixels(count, step, span, brightness_ramp=brightness_ramp),
+    ):
         if color != OFF:
             pixels[index] = color
     return tuple(pixels)
@@ -122,6 +138,7 @@ def pattern_frames(
     count: int,
     span: int,
     color: RgbPixel,
+    brightness_ramp: bool = False,
 ) -> list[LedFrame]:
     """Expand a named diagnostic pattern into frames."""
     if pattern == "solid":
@@ -130,17 +147,39 @@ def pattern_frames(
         return [build_frame(walk_pixels(count, color, step)) for step in range(count)]
     if pattern == "p1-chase":
         return [
-            build_frame(player1_chase_pixels(count, step, span))
+            build_frame(
+                player1_chase_pixels(
+                    count,
+                    step,
+                    span,
+                    brightness_ramp=brightness_ramp,
+                ),
+            )
             for step in range(count)
         ]
     if pattern == "p2-chase":
         return [
-            build_frame(player2_chase_pixels(count, step, span))
+            build_frame(
+                player2_chase_pixels(
+                    count,
+                    step,
+                    span,
+                    brightness_ramp=brightness_ramp,
+                ),
+            )
             for step in range(count)
         ]
     if pattern == "dual-chase":
         return [
-            build_frame(dual_chase_pixels(count, step, span)) for step in range(count)
+            build_frame(
+                dual_chase_pixels(
+                    count,
+                    step,
+                    span,
+                    brightness_ramp=brightness_ramp,
+                ),
+            )
+            for step in range(count)
         ]
     if pattern == "primaries":
         from toxic_game.engine.led_frames import NAMED_COLORS

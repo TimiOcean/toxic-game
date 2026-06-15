@@ -13,3 +13,12 @@ def resolve_strip_type(name: str) -> int:
     except AttributeError as error:
         message = f"unsupported strip type: {name}"
         raise ValueError(message) from error
+
+
+def resolve_rgbw_strip_type(byte_order: str) -> int:
+    """Return the rpi_ws281x strip type used for uniform RGBW output.
+
+    Wire byte order is handled separately via :func:`rgbw_color.rgbw_color_args`.
+    """
+    _ = byte_order
+    return resolve_strip_type("SK6812_STRIP_RGBW")
