@@ -24,4 +24,4 @@ def test_run_led_check_clears_strip_at_end() -> None:
     )
 
     assert len(output.frames) == 2
-    assert output.frames[-1] == solid_pixels(20, (0, 0, 0))
+    assert output.frames[-1] == solid_pixels(30, (0, 0, 0))

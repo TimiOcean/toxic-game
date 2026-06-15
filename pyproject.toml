@@ -12,10 +12,14 @@ dev = [
 pi = [
     "pygame>=2.6.1",
     "rpi-ws281x>=5.0.0",
+    # On Raspberry Pi OS, RPi.GPIO is usually a system package
+    # (python3-rpi.gpio). Offline installs can use a venv with
+    # --system-site-packages instead.
 ]
 
 [project.scripts]
 tg-led = "toxic_game.tools.led_check:main"
+tg-button = "toxic_game.tools.button_check:main"
 
 [build-system]
 requires = ["hatchling>=1.25.0"]

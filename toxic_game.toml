@@ -4,10 +4,11 @@ songs_dir = "songs"
 [gpio]
 left_contact_pin = 17
 right_contact_pin = 27
+debounce_ms = 30
 
 [led]
 muted_rgb_count = 60   # n: leading physical RGB LEDs (always off)
-rgbw_count = 20        # m: active RGBW gameplay LEDs
+rgbw_count = 30        # m: active RGBW gameplay LEDs
 pin = 18
 freq_hz = 800000
 dma = 10

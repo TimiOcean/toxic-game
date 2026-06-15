@@ -30,6 +30,7 @@ class GpioConfig:
 
     left_contact_pin: int
     right_contact_pin: int
+    debounce_ms: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -243,6 +244,7 @@ def _load_app_config_cached(config_path: Path) -> AppConfig:
         gpio=GpioConfig(
             left_contact_pin=_read_int(gpio_table, "left_contact_pin", 17),
             right_contact_pin=_read_int(gpio_table, "right_contact_pin", 27),
+            debounce_ms=_read_int(gpio_table, "debounce_ms", 30),
         ),
         led=_build_led_config(led_table),
         gameplay=GameplayConfig(
