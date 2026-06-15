@@ -28,10 +28,15 @@ uv run tg-led --pattern solid --color magenta
 uv run tg-led --pattern walk --color white
 uv run tg-led --pattern dual-chase
 uv run tg-led --pattern flash --side left --color white
-uv run tg-led --pattern flash --side right --color red
+uv run tg-led --pattern primaries --delay 1
 ```
 
-Index 0 is the **left** end (Player 1). Patterns end by clearing the strip.
+Index 0 of the **RGBW segment** is the **left** end (Player 1). The leading RGB LEDs stay off.
+
+Configure strip layout in `toxic_game.toml`:
+- `muted_rgb_count` (n) — leading RGB LEDs, always off
+- `rgbw_count` (m) — gameplay LEDs
+- `rgbw_byte_order` — channel order on wire (`WRGB`, `RGBW`, `GRBW`, …)
 
 ## Hardware reference
 

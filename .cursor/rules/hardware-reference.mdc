@@ -15,7 +15,8 @@ left_contact_pin = 17
 right_contact_pin = 27
 
 [led]
-count = 60
+muted_rgb_count = 20
+rgbw_count = 60
 pin = 18
 freq_hz = 800000
 dma = 10
@@ -42,7 +43,7 @@ channel = 0
 
 ## Toxic Game Differences from Prototype
 
-- Prototype splits strip into **left/right halves** for two lanes; Toxic Game uses **ends of one strip** for two players with traveling lights
+- Physical strip has **n muted RGB + m RGBW** LEDs; gameplay maps to the RGBW segment only
 - Prototype uses JSON charts; Toxic Game uses **plain-text tap note files** + separate song config
 - Prototype has a web UI; Toxic Game is **headless** (admin tools are CLI or separate scripts)
 

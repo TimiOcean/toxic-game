@@ -20,7 +20,8 @@ left_contact_pin = 17
 right_contact_pin = 27
 
 [led]
-count = 60
+muted_rgb_count = 20   # n: leading RGB LEDs (always off)
+rgbw_count = 60        # m: active RGBW gameplay LEDs
 pin = 18
 freq_hz = 800000
 dma = 10

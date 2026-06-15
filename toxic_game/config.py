@@ -36,7 +36,8 @@ class GpioConfig:
 class LedConfig:
     """LED strip configuration for the physical output adapter."""
 
-    count: int
+    muted_rgb_count: int
+    rgbw_count: int
     pin: int
     freq_hz: int
     dma: int
@@ -45,6 +46,20 @@ class LedConfig:
     channel: int
     hit_flash_ms: int
     running_light_span: int
+    muted_rgb_byte_order: str
+    rgbw_byte_order: str
+    muted_rgb_strip_type: str
+    rgbw_strip_type: str
+
+    @property
+    def total_count(self) -> int:
+        """Physical LEDs on the data line (muted RGB + active RGBW)."""
+        return self.muted_rgb_count + self.rgbw_count
+
+    @property
+    def active_count(self) -> int:
+        """Gameplay LEDs (RGBW segment only)."""
+        return self.rgbw_count
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,6 +136,13 @@ def _read_bool(table: dict[str, object], key: str, *, default: bool) -> bool:
     return default
 
 
+def _read_str(table: dict[str, object], key: str, default: str) -> str:
+    value = table.get(key, default)
+    if type(value) is str:
+        return value
+    return default
+
+
 def _read_path(
     config_dir: Path,
     table: dict[str, object],
@@ -157,6 +179,43 @@ def _build_health(table: dict[str, object]) -> HealthConfig:
     )
 
 
+def _build_led_config(led_table: dict[str, object]) -> LedConfig:
+    muted_rgb_count = _read_int(led_table, "muted_rgb_count", 0)
+    legacy_count = led_table.get("count")
+    if "rgbw_count" in led_table:
+        rgbw_count = _read_int(led_table, "rgbw_count", 60)
+    elif type(legacy_count) is int:
+        rgbw_count = legacy_count
+    else:
+        rgbw_count = 60
+
+    if muted_rgb_count < 0:
+        message = "muted_rgb_count must be >= 0"
+        raise ValueError(message)
+    if rgbw_count < 1:
+        message = "rgbw_count must be >= 1"
+        raise ValueError(message)
+
+    return LedConfig(
+        muted_rgb_count=muted_rgb_count,
+        rgbw_count=rgbw_count,
+        pin=_read_int(led_table, "pin", 18),
+        freq_hz=_read_int(led_table, "freq_hz", 800000),
+        dma=_read_int(led_table, "dma", 10),
+        invert=_read_bool(led_table, "invert", default=False),
+        brightness=_read_int(led_table, "brightness", 255),
+        channel=_read_int(led_table, "channel", 0),
+        hit_flash_ms=_read_int(led_table, "hit_flash_ms", 180),
+        running_light_span=_read_int(led_table, "running_light_span", 4),
+        muted_rgb_byte_order=_read_str(led_table, "muted_rgb_byte_order", "GRB"),
+        rgbw_byte_order=_read_str(led_table, "rgbw_byte_order", "WRGB"),
+        muted_rgb_strip_type=_read_str(
+            led_table, "muted_rgb_strip_type", "WS2811_STRIP_GRB"
+        ),
+        rgbw_strip_type=_read_str(led_table, "rgbw_strip_type", "SK6812_STRIP_GRBW"),
+    )
+
+
 @cache
 def _load_app_config_cached(config_path: Path) -> AppConfig:
     config_dir = config_path.parent
@@ -180,17 +239,7 @@ def _load_app_config_cached(config_path: Path) -> AppConfig:
             left_contact_pin=_read_int(gpio_table, "left_contact_pin", 17),
             right_contact_pin=_read_int(gpio_table, "right_contact_pin", 27),
         ),
-        led=LedConfig(
-            count=_read_int(led_table, "count", 60),
-            pin=_read_int(led_table, "pin", 18),
-            freq_hz=_read_int(led_table, "freq_hz", 800000),
-            dma=_read_int(led_table, "dma", 10),
-            invert=_read_bool(led_table, "invert", default=False),
-            brightness=_read_int(led_table, "brightness", 255),
-            channel=_read_int(led_table, "channel", 0),
-            hit_flash_ms=_read_int(led_table, "hit_flash_ms", 180),
-            running_light_span=_read_int(led_table, "running_light_span", 4),
-        ),
+        led=_build_led_config(led_table),
         gameplay=GameplayConfig(
             lead_time_beats=_read_int(gameplay_table, "lead_time_beats", 4),
             judgement_windows_ms=_build_judgement_windows(gameplay_table),

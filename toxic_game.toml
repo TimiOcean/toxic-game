@@ -6,7 +6,8 @@ left_contact_pin = 17
 right_contact_pin = 27
 
 [led]
-count = 60
+muted_rgb_count = 60   # n: leading RGB LEDs (always off)
+rgbw_count = 60        # m: active RGBW gameplay LEDs
 pin = 18
 freq_hz = 800000
 dma = 10
@@ -15,6 +16,10 @@ brightness = 255
 channel = 0
 hit_flash_ms = 180
 running_light_span = 4
+muted_rgb_byte_order = "GRB"
+rgbw_byte_order = "WRGB"
+muted_rgb_strip_type = "WS2811_STRIP_GRB"
+rgbw_strip_type = "SK6812_STRIP_GRBW"
 
 [gameplay]
 lead_time_beats = 4

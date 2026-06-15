@@ -27,6 +27,7 @@ PATTERN_CHOICES = (
     "p2-chase",
     "dual-chase",
     "flash",
+    "primaries",
 )
 
 
@@ -65,22 +66,24 @@ def run_led_check(
     output: FrameWriter = writer or Ws2811LedOutput()
     stdout(
         "Driving WS2811 output "
-        f"(count={led_config.count}, pin={led_config.pin}, "
+        f"(muted_rgb={led_config.muted_rgb_count}, "
+        f"rgbw={led_config.rgbw_count}, pin={led_config.pin}, "
         f"pattern={options.pattern}, color={options.color_name})\n",
     )
 
+    active = led_config.active_count
     if options.pattern == "flash":
         flash_color = NAMED_COLORS[options.color_name]
         side = "left" if options.side == "left" else "right"
         frames = [
             build_frame(
-                end_flash_pixels(led_config.count, side, flash_color),
+                end_flash_pixels(active, side, flash_color),
             ),
         ]
     else:
         frames = pattern_frames(
             pattern=options.pattern,
-            count=led_config.count,
+            count=active,
             span=led_config.running_light_span,
             color=color,
         )
@@ -91,7 +94,7 @@ def run_led_check(
             output.write_frame(frame)
             sleep(options.delay_s)
 
-    output.write_frame(build_frame(solid_pixels(led_config.count, OFF)))
+    output.write_frame(build_frame(solid_pixels(active, OFF)))
     stdout("LED check finished; output cleared\n")
 
 

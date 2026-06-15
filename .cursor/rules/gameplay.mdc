@@ -37,7 +37,9 @@ Two judgement tiers (windows from `toxic_game.toml`):
 
 ## LED Strip Layout
 
-- Single continuous strip; index 0 = **left end** (Player 1 hit zone), last index = **right end** (Player 2 hit zone)
+- Physical strip: **n** muted RGB LEDs + **m** active RGBW LEDs (`muted_rgb_count`, `rgbw_count` in config)
+- Game logic uses only the RGBW segment; leading RGB LEDs are always off
+- Logical index 0 = **left end** (Player 1 hit zone), last logical index = **right end** (Player 2 hit zone)
 - Running lights spawn **4 beats (1 bar)** before the hit beat (`lead_time_beats` in config)
 - Running lights communicate upcoming notes; end flashes communicate hit/miss feedback
 

@@ -113,6 +113,9 @@ def end_flash_pixels(count: int, side: Side, color: RgbPixel) -> tuple[RgbPixel,
     return tuple(pixels)
 
 
+PRIMARY_COLOR_NAMES = ("red", "green", "blue", "white", "magenta")
+
+
 def pattern_frames(
     *,
     pattern: str,
@@ -138,6 +141,13 @@ def pattern_frames(
     if pattern == "dual-chase":
         return [
             build_frame(dual_chase_pixels(count, step, span)) for step in range(count)
+        ]
+    if pattern == "primaries":
+        from toxic_game.engine.led_frames import NAMED_COLORS
+
+        return [
+            build_frame(solid_pixels(count, NAMED_COLORS[name]))
+            for name in PRIMARY_COLOR_NAMES
         ]
     message = f"unsupported pattern: {pattern}"
     raise ValueError(message)
