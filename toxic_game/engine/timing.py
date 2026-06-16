@@ -5,6 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 DEFAULT_BEATS_PER_BAR = 4
+BEAT_PULSE_PEAK = 1.0
+BEAT_PULSE_FLOOR = 0.15
+BEAT_PULSE_CYCLE_BEATS = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +114,21 @@ def bar_beat_text_to_ms(timing: SongTiming, text: str) -> float:
         beats_per_bar=timing.beats_per_bar,
     )
     return absolute_beat_to_ms(timing, absolute_beat)
+
+
+def beat_pulse_brightness(timing: SongTiming, playback_ms: int) -> float:
+    """Return running-light brightness for the current beat phase.
+
+    Peaks at 100% every two beats, linear fade to 15% by the next even downbeat,
+    then jumps back to 100%.
+    """
+    absolute_beat = ms_to_absolute_beat(timing, playback_ms)
+    if absolute_beat < 0:
+        return BEAT_PULSE_PEAK
+
+    cycle_fraction = (absolute_beat % BEAT_PULSE_CYCLE_BEATS) / BEAT_PULSE_CYCLE_BEATS
+    span = BEAT_PULSE_PEAK - BEAT_PULSE_FLOOR
+    return BEAT_PULSE_PEAK - cycle_fraction * span
 
 
 def ms_to_bar_beat(timing: SongTiming, playback_ms: int) -> tuple[int, int] | None:

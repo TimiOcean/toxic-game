@@ -29,10 +29,10 @@ def test_load_default_config() -> None:
     assert config.led.total_count == 90
     assert config.led.active_count == 30
     assert config.led.rgbw_byte_order == "WRGB"
-    assert config.led.hit_flash_ms == 180
+    assert config.led.hit_flash_ms == 500
     assert config.led.running_light_span == 4
-    assert config.gameplay.lead_time_beats == 4
-    assert config.gameplay.judgement_windows_ms.perfect == 20
+    assert config.gameplay.lead_time_beats == 8
+    assert config.gameplay.judgement_windows_ms.perfect == 100
     assert config.gameplay.judgement_windows_ms.good == 300
     assert config.gameplay.health.start == 20
     assert config.gameplay.health.max == 20

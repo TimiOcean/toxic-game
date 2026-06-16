@@ -14,7 +14,6 @@ from toxic_game.config import (
 from toxic_game.engine.button_manager import ButtonPresses
 from toxic_game.engine.game import GameManager
 from toxic_game.engine.notes import ResolvedNote
-from toxic_game.engine.led_frames import WHITE
 from toxic_game.hw.led_output import SimLedOutput
 
 
@@ -33,6 +32,10 @@ class ScriptedSongManager:
     def stop(self) -> None:
         self.stop_called = True
         self.is_playing = False
+
+    @property
+    def timing(self) -> None:
+        return None
 
 
 class ScriptedButtons:
@@ -118,7 +121,9 @@ def test_tick_scores_presses_and_misses() -> None:
     game.tick()
     song.position_ms = 1000
     game.tick()
-    assert led.frames[-1][0] == WHITE
+    # Perfect P1 hit lights a gold flash at the left end; the green channel
+    # can only come from that flash (magenta travel has g == 0).
+    assert led.frames[-1][0][1] > 0
 
     song.position_ms = 1040
     game.tick()

@@ -10,6 +10,7 @@ from toxic_game.engine.timing import (
     absolute_beat_to_ms,
     bar_beat_text_to_ms,
     bar_beat_to_absolute_beat,
+    beat_pulse_brightness,
     format_bar_beat,
     ms_to_absolute_beat,
     ms_to_bar_beat,
@@ -81,3 +82,18 @@ def test_ms_to_bar_beat_before_first_beat(timing_120: SongTiming) -> None:
 def test_ms_to_bar_beat_after_first_beat(timing_120: SongTiming) -> None:
     assert ms_to_bar_beat(timing_120, 500) == (1, 1)
     assert ms_to_bar_beat(timing_120, 5000) == (3, 2)
+
+
+def test_beat_pulse_brightness_peaks_on_downbeat(timing_120: SongTiming) -> None:
+    assert beat_pulse_brightness(timing_120, 500) == 1.0
+    assert beat_pulse_brightness(timing_120, 1000) == pytest.approx(0.575)
+    assert beat_pulse_brightness(timing_120, 1500) == 1.0
+
+
+def test_beat_pulse_brightness_fades_mid_cycle(timing_120: SongTiming) -> None:
+    assert beat_pulse_brightness(timing_120, 750) == pytest.approx(0.7875)
+    assert beat_pulse_brightness(timing_120, 1250) == pytest.approx(0.3625)
+
+
+def test_beat_pulse_brightness_before_first_beat(timing_120: SongTiming) -> None:
+    assert beat_pulse_brightness(timing_120, 0) == 1.0

@@ -11,6 +11,9 @@ WHITE: RgbPixel = (255, 255, 255)
 RED: RgbPixel = (255, 0, 0)
 MAGENTA: RgbPixel = (255, 0, 255)
 CYAN: RgbPixel = (0, 200, 255)
+YELLOW: RgbPixel = (255, 255, 0)
+GOLD: RgbPixel = (200, 140, 0)
+GREY_WHITE: RgbPixel = (150, 150, 150)
 
 NAMED_COLORS: dict[str, RgbPixel] = {
     "off": OFF,
@@ -20,6 +23,7 @@ NAMED_COLORS: dict[str, RgbPixel] = {
     "white": WHITE,
     "magenta": MAGENTA,
     "cyan": CYAN,
+    "yellow": YELLOW,
 }
 
 

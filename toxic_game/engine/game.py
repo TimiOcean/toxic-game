@@ -192,6 +192,7 @@ class GameManager:
             notes=(*self._pending_p1, *self._pending_p2),
             feedback=tuple(self._feedback),
             hit_flash_ms=self._led.hit_flash_ms,
+            timing=self._song_manager.timing,
         )
         self._led_output.write_frame(frame)
         return GameSnapshot(

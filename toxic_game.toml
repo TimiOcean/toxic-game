@@ -15,15 +15,15 @@ dma = 10
 invert = false
 brightness = 255
 channel = 0
-hit_flash_ms = 180
+hit_flash_ms = 500
 running_light_span = 4
 rgbw_byte_order = "WRGB"
 
 [gameplay]
-lead_time_beats = 4
+lead_time_beats = 8
 
 [gameplay.judgement_windows_ms]
-perfect = 20
+perfect = 100
 good = 300
 
 [gameplay.health]
