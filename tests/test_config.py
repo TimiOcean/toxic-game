@@ -22,6 +22,8 @@ def test_load_default_config() -> None:
     assert config.gpio.debounce_ms == 30
     assert config.led.muted_rgb_count == 60
     assert config.led.rgbw_count == 30
+    assert config.led.pin == 10
+    assert config.led.data_interface == "spi"
     assert config.led.muted_rgbw_count == 45
     assert config.led.driver_count == 75
     assert config.led.total_count == 90
