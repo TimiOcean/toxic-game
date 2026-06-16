@@ -72,6 +72,11 @@ class LedConfig:
         """Uniform RGBW pixels passed to rpi_ws281x."""
         return self.muted_rgbw_count + self.rgbw_count
 
+    @property
+    def data_interface(self) -> str:
+        """Return ``spi`` or ``pwm`` based on the configured data GPIO pin."""
+        return "spi" if self.pin == 10 else "pwm"
+
 
 @dataclass(frozen=True, slots=True)
 class JudgementWindowsMs:

@@ -7,6 +7,7 @@ from typing import Protocol, cast
 
 from toxic_game.config import build_led_config
 from toxic_game.engine.led_frames import LedFrame, RgbPixel
+from toxic_game.hw.led_audio_compat import led_audio_conflict_message
 from toxic_game.hw.rgbw_color import rgbw_color_args
 from toxic_game.hw.strip_types import resolve_rgbw_strip_type
 
@@ -93,6 +94,10 @@ class Ws2811LedOutput:
             return None
 
         config = build_led_config()
+        conflict = led_audio_conflict_message(pin=config.pin)
+        if conflict is not None:
+            message = conflict
+            raise RuntimeError(message)
 
         strip = strip_class(
             config.driver_count,

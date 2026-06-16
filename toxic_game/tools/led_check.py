@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 from toxic_game.config import build_led_config
 from toxic_game.engine.led_frames import NAMED_COLORS, OFF, LedFrame, build_frame
+from toxic_game.hw.led_audio_compat import led_audio_conflict_message
 from toxic_game.hw.led_output import Ws2811LedOutput
 from toxic_game.hw.led_patterns import end_flash_pixels, pattern_frames, solid_pixels
 
@@ -62,11 +63,15 @@ def run_led_check(
 ) -> None:
     """Drive the LED strip with a diagnostic pattern."""
     led_config = build_led_config()
+    conflict = led_audio_conflict_message(pin=led_config.pin)
+    if conflict is not None:
+        stdout(f"warning: {conflict}\n")
     color = NAMED_COLORS[options.color_name]
     output: FrameWriter = writer or Ws2811LedOutput()
     stdout(
         "Driving RGBW output "
-        f"(muted_rgb={led_config.muted_rgb_count}, "
+        f"(interface={led_config.data_interface}, "
+        f"muted_rgb={led_config.muted_rgb_count}, "
         f"muted_rgbw={led_config.muted_rgbw_count}, "
         f"rgbw={led_config.rgbw_count}, "
         f"driver={led_config.driver_count}, pin={led_config.pin}, "

@@ -9,7 +9,7 @@ debounce_ms = 30
 [led]
 muted_rgb_count = 60   # n: leading physical RGB LEDs (always off)
 rgbw_count = 30        # m: active RGBW gameplay LEDs
-pin = 18
+pin = 10               # SPI MOSI (physical pin 19); use with 3.5mm audio
 freq_hz = 800000
 dma = 10
 invert = false
