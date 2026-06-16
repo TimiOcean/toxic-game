@@ -1,9 +1,11 @@
-"""Gameplay LED projection from active tap notes."""
+"""Gameplay LED projection from active tap notes and hit feedback."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Literal
+
 from toxic_game.engine.led_frames import (
-    CYAN,
     MAGENTA,
     OFF,
     RED,
@@ -14,7 +16,19 @@ from toxic_game.engine.led_frames import (
     build_frame,
 )
 from toxic_game.engine.notes import ResolvedNote
+from toxic_game.engine.scoring import Judgement
 from toxic_game.hw.led_patterns import player1_chase_pixels, player2_chase_pixels
+
+PlayerId = Literal[1, 2]
+
+
+@dataclass(frozen=True, slots=True)
+class HitFeedback:
+    """A short end-flash triggered by scoring judgement."""
+
+    player: PlayerId
+    started_ms: int
+    judgement: Judgement
 
 
 def _merge_pixels(
@@ -60,22 +74,29 @@ def _note_travel_pixels(
     return player2_chase_pixels(strip_len, step, span, brightness_ramp=True)
 
 
-def _flash_pixels(
+def _feedback_color(judgement: Judgement) -> RgbPixel:
+    if judgement == Judgement.ERROR:
+        return RED
+    return WHITE
+
+
+def _feedback_flash_pixels(
     *,
     strip_len: int,
-    note: ResolvedNote,
+    feedback: HitFeedback,
     progress_ms: int,
     hit_flash_ms: int,
 ) -> tuple[RgbPixel, ...]:
-    age_ms = progress_ms - note.hit_ms
+    age_ms = progress_ms - feedback.started_ms
     if age_ms < 0 or age_ms >= hit_flash_ms:
         return tuple(OFF for _ in range(strip_len))
 
     pixels = blank_pixels(strip_len)
-    if note.player == 1:
-        pixels[0] = WHITE
+    color = _feedback_color(feedback.judgement)
+    if feedback.player == 1:
+        pixels[0] = color
     else:
-        pixels[strip_len - 1] = RED
+        pixels[strip_len - 1] = color
     return tuple(pixels)
 
 
@@ -85,9 +106,10 @@ def build_gameplay_frame(
     span: int,
     progress_ms: int,
     notes: tuple[ResolvedNote, ...],
+    feedback: tuple[HitFeedback, ...],
     hit_flash_ms: int,
 ) -> LedFrame:
-    """Project active tap notes and hit flashes onto the gameplay strip."""
+    """Project active tap notes and judgement flashes onto the gameplay strip."""
     pixels = blank_pixels(strip_len)
 
     for note in notes:
@@ -98,10 +120,10 @@ def build_gameplay_frame(
             progress_ms=progress_ms,
         ))
 
-    for note in notes:
-        _merge_pixels(pixels, _flash_pixels(
+    for flash in feedback:
+        _merge_pixels(pixels, _feedback_flash_pixels(
             strip_len=strip_len,
-            note=note,
+            feedback=flash,
             progress_ms=progress_ms,
             hit_flash_ms=hit_flash_ms,
         ))

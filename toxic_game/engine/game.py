@@ -9,7 +9,7 @@ from typing import Protocol
 from toxic_game.config import GameplayConfig, LedConfig, RuntimeConfig
 from toxic_game.engine.button_manager import ButtonManager, ButtonPresses
 from toxic_game.engine.health import HealthState, apply_judgement, make_health_state
-from toxic_game.engine.led_gameplay import build_gameplay_frame
+from toxic_game.engine.led_gameplay import HitFeedback, build_gameplay_frame
 from toxic_game.engine.notes import ResolvedNote
 from toxic_game.engine.scoring import Judgement, evaluate_press, pop_missed_notes
 from toxic_game.engine.song_manager import SongManager
@@ -59,6 +59,7 @@ class GameManager:
 
         self._pending_p1: tuple[ResolvedNote, ...] = ()
         self._pending_p2: tuple[ResolvedNote, ...] = ()
+        self._feedback: list[HitFeedback] = []
         self._health_state: HealthState = make_health_state(gameplay.health)
         self._perfect_count = 0
         self._good_count = 0
@@ -75,12 +76,35 @@ class GameManager:
         """Start gameplay with the provided resolved notes."""
         self._pending_p1 = tuple(sorted(notes_p1, key=lambda note: note.hit_ms))
         self._pending_p2 = tuple(sorted(notes_p2, key=lambda note: note.hit_ms))
+        self._feedback = []
         self._health_state = make_health_state(self._gameplay.health)
         self._perfect_count = 0
         self._good_count = 0
         self._error_count = 0
         self._game_over = False
         self._song_manager.play(start_ms=start_ms)
+
+    def _prune_feedback(self, *, now_ms: int) -> None:
+        self._feedback = [
+            flash
+            for flash in self._feedback
+            if now_ms - flash.started_ms < self._led.hit_flash_ms
+        ]
+
+    def _add_feedback(
+        self,
+        *,
+        player: int,
+        judgement: Judgement,
+        started_ms: int,
+    ) -> None:
+        self._feedback.append(
+            HitFeedback(
+                player=player,  # type: ignore[arg-type]
+                started_ms=started_ms,
+                judgement=judgement,
+            ),
+        )
 
     def _consume_misses(self, *, now_ms: int) -> None:
         self._pending_p1, missed_p1 = pop_missed_notes(
@@ -93,8 +117,12 @@ class GameManager:
             now_ms=now_ms,
             windows=self._gameplay.judgement_windows_ms,
         )
-        missed_count = len(missed_p1) + len(missed_p2)
-        for _ in range(missed_count):
+        for note in (*missed_p1, *missed_p2):
+            self._add_feedback(
+                player=note.player,
+                judgement=Judgement.ERROR,
+                started_ms=now_ms,
+            )
             self._apply_judgement(Judgement.ERROR)
 
     def _apply_judgement(self, judgement: Judgement | None) -> None:
@@ -127,11 +155,18 @@ class GameManager:
                 self._pending_p1 = filtered
             else:
                 self._pending_p2 = filtered
-        self._apply_judgement(result.judgement)
+        if result.judgement is not None:
+            self._add_feedback(
+                player=player,
+                judgement=result.judgement,
+                started_ms=press_ms,
+            )
+            self._apply_judgement(result.judgement)
 
     def tick(self) -> GameSnapshot:
         """Advance gameplay by one frame."""
         now_ms = self._song_manager.position_ms
+        self._prune_feedback(now_ms=now_ms)
 
         self._consume_misses(now_ms=now_ms)
         if not self._game_over:
@@ -146,6 +181,7 @@ class GameManager:
             span=self._led.running_light_span,
             progress_ms=now_ms,
             notes=(*self._pending_p1, *self._pending_p2),
+            feedback=tuple(self._feedback),
             hit_flash_ms=self._led.hit_flash_ms,
         )
         self._led_output.write_frame(frame)

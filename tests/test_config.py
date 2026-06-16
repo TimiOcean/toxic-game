@@ -33,7 +33,7 @@ def test_load_default_config() -> None:
     assert config.led.running_light_span == 4
     assert config.gameplay.lead_time_beats == 4
     assert config.gameplay.judgement_windows_ms.perfect == 20
-    assert config.gameplay.judgement_windows_ms.good == 50
+    assert config.gameplay.judgement_windows_ms.good == 300
     assert config.gameplay.health.start == 20
     assert config.gameplay.health.max == 20
     assert config.gameplay.health.lose_on_error == 2

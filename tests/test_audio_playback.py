@@ -19,10 +19,43 @@ def test_noop_audio_player_accepts_calls(tmp_path: Path) -> None:
     player.close()
 
 
-def test_pygame_audio_player_without_pygame(tmp_path: Path) -> None:
-    player = PygameAudioPlayer()
+def test_pygame_audio_player_without_pygame(tmp_path: Path, monkeypatch) -> None:
     audio_path = tmp_path / "track.ogg"
     audio_path.write_bytes(b"fake")
+
+    class FakeMusic:
+        def load(self, filename: str) -> None:
+            _ = filename
+
+        def play(self, *, start: float = 0.0) -> None:
+            _ = start
+
+        def pause(self) -> None:
+            return None
+
+        def unpause(self) -> None:
+            return None
+
+        def stop(self) -> None:
+            return None
+
+    class FakeMixer:
+        music = FakeMusic()
+
+        def get_init(self) -> object:
+            return object()
+
+        def init(self) -> None:
+            return None
+
+        def quit(self) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "toxic_game.hw.audio_playback.PygameAudioPlayer._load_mixer",
+        lambda self: FakeMixer(),
+    )
+    player = PygameAudioPlayer()
 
     player.play(audio_path)
     player.pause()

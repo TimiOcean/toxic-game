@@ -14,6 +14,7 @@ from toxic_game.config import (
 from toxic_game.engine.button_manager import ButtonPresses
 from toxic_game.engine.game import GameManager
 from toxic_game.engine.notes import ResolvedNote
+from toxic_game.engine.led_frames import WHITE
 from toxic_game.hw.led_output import SimLedOutput
 
 
@@ -117,6 +118,8 @@ def test_tick_scores_presses_and_misses() -> None:
     game.tick()
     song.position_ms = 1000
     game.tick()
+    assert led.frames[-1][0] == WHITE
+
     song.position_ms = 1040
     game.tick()
     song.position_ms = 1300
