@@ -7,7 +7,7 @@ right_contact_pin = 27
 debounce_ms = 30
 
 [led]
-muted_rgb_count = 60   # n: leading physical RGB LEDs (always off)
+muted_rgb_count = 0   # n: leading physical RGB LEDs (always off)
 rgbw_count = 30        # m: active RGBW gameplay LEDs
 pin = 18
 freq_hz = 800000
