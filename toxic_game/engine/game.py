@@ -9,7 +9,7 @@ from typing import Protocol
 from toxic_game.config import GameplayConfig, LedConfig, RuntimeConfig
 from toxic_game.engine.button_manager import ButtonManager, ButtonPresses
 from toxic_game.engine.health import HealthState, apply_judgement, make_health_state
-from toxic_game.engine.led_gameplay import HitFeedback, build_gameplay_frame
+from toxic_game.engine.led_gameplay import HitFeedback, build_gameplay_frame, feedback_duration_ms
 from toxic_game.engine.notes import ResolvedNote
 from toxic_game.engine.scoring import Judgement, evaluate_press, pop_missed_notes
 from toxic_game.engine.song_manager import SongManager
@@ -90,7 +90,7 @@ class GameManager:
         self._feedback = [
             flash
             for flash in self._feedback
-            if now_ms - flash.started_ms < self._led.hit_flash_ms
+            if now_ms - flash.started_ms < feedback_duration_ms(flash, self._led)
         ]
 
     def _add_feedback(
@@ -191,7 +191,7 @@ class GameManager:
             progress_ms=now_ms,
             notes=(*self._pending_p1, *self._pending_p2),
             feedback=tuple(self._feedback),
-            hit_flash_ms=self._led.hit_flash_ms,
+            led=self._led,
             timing=self._song_manager.timing,
         )
         self._led_output.write_frame(frame)

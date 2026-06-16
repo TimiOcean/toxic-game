@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from toxic_game.config import LedConfig
 from toxic_game.engine.led_frames import (
+    CYAN,
     GOLD,
     MAGENTA,
     OFF,
@@ -15,6 +17,7 @@ from toxic_game.engine.led_frames import (
     LedFrame,
     blank_pixels,
     build_frame,
+    scale_pixel,
 )
 from toxic_game.engine.notes import ResolvedNote
 from toxic_game.engine.scoring import Judgement
@@ -22,6 +25,8 @@ from toxic_game.engine.timing import SongTiming, beat_pulse_brightness
 from toxic_game.hw.led_patterns import player1_chase_pixels, player2_chase_pixels
 
 PlayerId = Literal[1, 2]
+
+MARKER_INTENSITY = 0.15
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,11 +53,72 @@ def _merge_pixels(
         )
 
 
-def _travel_ratio(*, progress_ms: int, spawn_ms: int, hit_ms: int) -> float | None:
-    if progress_ms < spawn_ms or progress_ms >= hit_ms:
+def hit_marker_range(
+    *,
+    player: PlayerId,
+    strip_len: int,
+    span: int,
+    fraction: float,
+) -> tuple[int, int]:
+    """Return inclusive LED indices for the static hit marker on one side."""
+    offset = max(0, round((strip_len - 1) * fraction))
+    if player == 1:
+        start = offset
+        end = min(start + span - 1, strip_len - 1)
+    else:
+        end = strip_len - 1 - offset
+        start = max(end - span + 1, 0)
+    return start, end
+
+
+def _travel_ratio(
+    *,
+    progress_ms: int,
+    spawn_ms: int,
+    hit_ms: int,
+) -> float | None:
+    if progress_ms < spawn_ms or progress_ms > hit_ms:
         return None
+
     travel_ms = max(hit_ms - spawn_ms, 1)
     return (progress_ms - spawn_ms) / travel_ms
+
+
+def _active_feedback_players(
+    feedback: tuple[HitFeedback, ...],
+    *,
+    progress_ms: int,
+    led: LedConfig,
+) -> frozenset[PlayerId]:
+    active: set[PlayerId] = set()
+    for flash in feedback:
+        age_ms = progress_ms - flash.started_ms
+        if 0 <= age_ms < led.hit_flash_ms:
+            active.add(flash.player)
+    return frozenset(active)
+
+
+def _static_marker_pixels(
+    *,
+    strip_len: int,
+    span: int,
+    led: LedConfig,
+    hidden_players: frozenset[PlayerId] = frozenset(),
+) -> tuple[RgbPixel, ...]:
+    pixels = blank_pixels(strip_len)
+    for player, color in ((1, MAGENTA), (2, CYAN)):
+        if player in hidden_players:
+            continue
+        start, end = hit_marker_range(
+            player=player,  # type: ignore[arg-type]
+            strip_len=strip_len,
+            span=span,
+            fraction=led.hit_marker_fraction,
+        )
+        lit = scale_pixel(color, MARKER_INTENSITY)
+        for index in range(start, end + 1):
+            pixels[index] = lit
+    return tuple(pixels)
 
 
 def _note_travel_pixels(
@@ -62,6 +128,7 @@ def _note_travel_pixels(
     note: ResolvedNote,
     progress_ms: int,
     timing: SongTiming | None,
+    led: LedConfig,
 ) -> tuple[RgbPixel, ...]:
     ratio = _travel_ratio(
         progress_ms=progress_ms,
@@ -71,27 +138,44 @@ def _note_travel_pixels(
     if ratio is None:
         return tuple(OFF for _ in range(strip_len))
 
+    marker_start, marker_end = hit_marker_range(
+        player=note.player,  # type: ignore[arg-type]
+        strip_len=strip_len,
+        span=span,
+        fraction=led.hit_marker_fraction,
+    )
     beat_pulse = (
         beat_pulse_brightness(timing, progress_ms)
         if timing is not None
         else 1.0
     )
-    step = round(ratio * max(strip_len - 1, 0))
+
     if note.player == 1:
+        marker_head = marker_end
+        max_step = max((strip_len - 1) - marker_head, 0)
+        head_index = (strip_len - 1) - round(ratio * max_step)
         return player1_chase_pixels(
             strip_len,
-            step,
+            head_index,
             span,
             brightness_ramp=True,
             beat_pulse=beat_pulse,
         )
+
+    max_step = max(marker_start, 0)
+    head_index = round(ratio * max_step)
     return player2_chase_pixels(
         strip_len,
-        step,
+        head_index,
         span,
         brightness_ramp=True,
         beat_pulse=beat_pulse,
     )
+
+
+def _triangular_peak_factor(*, t: float) -> float:
+    """Triangle wave with peak at t=0.5 and zeros at t=0 and t=1."""
+    return 1.0 - abs(2.0 * t - 1.0)
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,52 +185,23 @@ class _FeedbackStyle:
     base_color: RgbPixel
     start_size: int
     max_size: int
-    has_sparkles: bool
     distance_falloff: float
 
 
 def _feedback_style(*, judgement: Judgement, strip_len: int) -> _FeedbackStyle:
     """Return flash style scaled to the gameplay strip length."""
     if judgement == Judgement.PERFECT:
-        return _FeedbackStyle(
-            base_color=WHITE,
-            start_size=1,
-            max_size=max(3, round(strip_len * 0.35)),
-            has_sparkles=True,
-            distance_falloff=0.25,
-        )
-    if judgement == Judgement.GOOD:
-        return _FeedbackStyle(
-            base_color=GOLD,
-            start_size=1,
-            max_size=max(2, round(strip_len * 0.15)),
-            has_sparkles=False,
-            distance_falloff=0.5,
-        )
+        base_color = WHITE
+    elif judgement == Judgement.GOOD:
+        base_color = GOLD
+    else:
+        base_color = RED
     return _FeedbackStyle(
-        base_color=RED,
+        base_color=base_color,
         start_size=1,
         max_size=max(2, round(strip_len * 0.15)),
-        has_sparkles=False,
         distance_falloff=0.5,
     )
-
-
-def _triangular_peak_factor(*, t: float) -> float:
-    """Triangle wave with peak at t=0.5 and zeros at t=0 and t=1."""
-    # 0..1..0
-    return 1.0 - abs(2.0 * t - 1.0)
-
-
-def _sparkle_blanked(*, index: int, age_ms: int, distance_from_end: int) -> bool:
-    """Deterministically blank some burst pixels to create a sparkle shimmer.
-
-    The hit-end pixel is never blanked so the flash stays anchored.
-    """
-    if distance_from_end == 0:
-        return False
-    phase = age_ms // 40
-    return (index * 7 + phase * 3) % 5 < 2
 
 
 def _feedback_flash_pixels(
@@ -154,17 +209,17 @@ def _feedback_flash_pixels(
     strip_len: int,
     feedback: HitFeedback,
     progress_ms: int,
-    hit_flash_ms: int,
+    led: LedConfig,
 ) -> tuple[RgbPixel, ...]:
     age_ms = progress_ms - feedback.started_ms
-    if age_ms < 0 or age_ms >= hit_flash_ms:
+    if age_ms < 0 or age_ms >= led.hit_flash_ms:
         return tuple(OFF for _ in range(strip_len))
 
     style = _feedback_style(judgement=feedback.judgement, strip_len=strip_len)
     max_size = max(1, min(strip_len, style.max_size))
     start_size = max(1, min(strip_len, style.start_size))
 
-    t = age_ms / max(hit_flash_ms, 1)
+    t = age_ms / max(led.hit_flash_ms, 1)
     peak = _triangular_peak_factor(t=t)
     size = start_size + round((max_size - start_size) * peak)
     size = max(1, min(strip_len, size))
@@ -178,20 +233,10 @@ def _feedback_flash_pixels(
         lit_end = strip_len - 1
 
     for index in range(lit_start, lit_end + 1):
-        # Distance from the hit end: 0 at the end pixel.
         if feedback.player == 1:
             d = index - lit_start
         else:
             d = lit_end - index
-
-        if style.has_sparkles and _sparkle_blanked(
-            index=index,
-            age_ms=age_ms,
-            distance_from_end=d,
-        ):
-            # Sparkle: this pixel is fully off this frame.
-            pixels[index] = OFF
-            continue
 
         denom = max(size - 1, 1)
         distance_factor = 1.0 - (d / denom) * style.distance_falloff
@@ -207,6 +252,11 @@ def _feedback_flash_pixels(
     return tuple(pixels)
 
 
+def feedback_duration_ms(feedback: HitFeedback, led: LedConfig) -> int:
+    """Return how long one feedback entry stays visible."""
+    return led.hit_flash_ms
+
+
 def build_gameplay_frame(
     *,
     strip_len: int,
@@ -214,11 +264,21 @@ def build_gameplay_frame(
     progress_ms: int,
     notes: tuple[ResolvedNote, ...],
     feedback: tuple[HitFeedback, ...],
-    hit_flash_ms: int,
+    led: LedConfig,
     timing: SongTiming | None = None,
 ) -> LedFrame:
     """Project active tap notes and judgement flashes onto the gameplay strip."""
-    pixels = blank_pixels(strip_len)
+    hidden_markers = _active_feedback_players(
+        feedback,
+        progress_ms=progress_ms,
+        led=led,
+    )
+    pixels = list(_static_marker_pixels(
+        strip_len=strip_len,
+        span=span,
+        led=led,
+        hidden_players=hidden_markers,
+    ))
 
     for note in notes:
         _merge_pixels(pixels, _note_travel_pixels(
@@ -227,6 +287,7 @@ def build_gameplay_frame(
             note=note,
             progress_ms=progress_ms,
             timing=timing,
+            led=led,
         ))
 
     for flash in feedback:
@@ -234,7 +295,7 @@ def build_gameplay_frame(
             strip_len=strip_len,
             feedback=flash,
             progress_ms=progress_ms,
-            hit_flash_ms=hit_flash_ms,
+            led=led,
         ))
 
     return build_frame(pixels)

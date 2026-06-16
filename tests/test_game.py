@@ -90,6 +90,7 @@ def _led_config() -> LedConfig:
         hit_flash_ms=180,
         running_light_span=2,
         rgbw_byte_order="WRGB",
+        hit_marker_fraction=0.10,
     )
 
 
@@ -121,9 +122,8 @@ def test_tick_scores_presses_and_misses() -> None:
     game.tick()
     song.position_ms = 1000
     game.tick()
-    # Perfect P1 hit lights a gold flash at the left end; the green channel
-    # can only come from that flash (magenta travel has g == 0).
-    assert led.frames[-1][0][1] > 0
+    # Perfect P1 hit triggers a white burst at the left end.
+    assert led.frames[-1][0] == (255, 255, 255)
 
     song.position_ms = 1040
     game.tick()

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from toxic_game.engine.led_frames import MAGENTA, OFF, WHITE
+from toxic_game.engine.led_frames import MAGENTA, OFF, WHITE, scale_pixel
 from toxic_game.hw.led_patterns import (
     dual_chase_pixels,
     end_flash_pixels,
@@ -23,42 +23,55 @@ def test_walk_pixel_moves_left_to_right() -> None:
 
 
 def test_player1_chase_starts_on_right_end() -> None:
-    pixels = player1_chase_pixels(count=10, step=0, span=4)
+    pixels = player1_chase_pixels(count=10, head_index=9, span=4)
 
     assert pixels[-1] != OFF
     assert pixels[0] == OFF
 
 
 def test_player1_chase_ends_on_left_end() -> None:
-    pixels = player1_chase_pixels(count=10, step=9, span=4)
+    pixels = player1_chase_pixels(count=10, head_index=3, span=4)
 
     assert pixels[0] != OFF
     assert pixels[-1] == OFF
 
 
 def test_player1_chase_gets_brighter_toward_left() -> None:
-    dim = player1_chase_pixels(count=10, step=0, span=1)
-    bright = player1_chase_pixels(count=10, step=9, span=1)
+    dim = player1_chase_pixels(count=10, head_index=9, span=1)
+    bright = player1_chase_pixels(count=10, head_index=0, span=1)
 
     assert sum(bright[0]) > sum(dim[-1])
 
 
+def test_player1_chase_has_soft_edge_pixels() -> None:
+    pixels = player1_chase_pixels(count=10, head_index=5, span=2)
+
+    core = next(pixel for pixel in pixels if sum(pixel) == max(sum(p) for p in pixels))
+    left_edge = pixels[3]
+    right_edge = pixels[6]
+
+    assert left_edge != OFF
+    assert right_edge != OFF
+    assert left_edge == scale_pixel(core, 0.10)
+    assert right_edge == scale_pixel(core, 0.10)
+
+
 def test_player2_chase_starts_on_left_end() -> None:
-    pixels = player2_chase_pixels(count=10, step=0, span=4)
+    pixels = player2_chase_pixels(count=10, head_index=0, span=4)
 
     assert pixels[0] != OFF
     assert pixels[-1] == OFF
 
 
 def test_player2_chase_ends_on_right_end() -> None:
-    pixels = player2_chase_pixels(count=10, step=9, span=4)
+    pixels = player2_chase_pixels(count=10, head_index=6, span=4)
 
     assert pixels[-1] != OFF
     assert pixels[0] == OFF
 
 
 def test_player2_chase_uses_cyan() -> None:
-    pixels = player2_chase_pixels(count=10, step=5, span=1)
+    pixels = player2_chase_pixels(count=10, head_index=5, span=1)
 
     lit = next(color for color in pixels if color != OFF)
     assert lit[2] > lit[0]

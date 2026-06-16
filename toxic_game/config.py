@@ -48,6 +48,7 @@ class LedConfig:
     hit_flash_ms: int
     running_light_span: int
     rgbw_byte_order: str
+    hit_marker_fraction: float
 
     @property
     def total_count(self) -> int:
@@ -145,6 +146,13 @@ def _read_int(table: dict[str, object], key: str, default: int) -> int:
     return default
 
 
+def _read_float(table: dict[str, object], key: str, default: float) -> float:
+    value = table.get(key, default)
+    if type(value) in {int, float}:
+        return float(value)
+    return default
+
+
 def _read_bool(table: dict[str, object], key: str, *, default: bool) -> bool:
     value = table.get(key, default)
     if type(value) is bool:
@@ -224,6 +232,7 @@ def _build_led_config(led_table: dict[str, object]) -> LedConfig:
         hit_flash_ms=_read_int(led_table, "hit_flash_ms", 180),
         running_light_span=_read_int(led_table, "running_light_span", 4),
         rgbw_byte_order=_read_str(led_table, "rgbw_byte_order", "WRGB"),
+        hit_marker_fraction=_read_float(led_table, "hit_marker_fraction", 0.10),
     )
 
 
