@@ -5,6 +5,8 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING, Protocol
 
+from toxic_game.hw.audio_device import configure_headphone_audio
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -87,6 +89,7 @@ class PygameAudioPlayer:
 
     def __init__(self) -> None:
         """Initialize pygame.mixer when available."""
+        configure_headphone_audio()
         self._mixer = self._load_mixer()
         self._paused = False
 
