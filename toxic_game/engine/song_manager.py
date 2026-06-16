@@ -37,6 +37,7 @@ class SongManager:
         self._paused_at_s: float | None = None
         self._paused_total_s = 0.0
         self._start_offset_ms = 0
+        self._ended_position_ms: int | None = None
 
     @property
     def song(self) -> SongConfig | None:
@@ -53,7 +54,17 @@ class SongManager:
     @property
     def is_playing(self) -> bool:
         """Return True while playback is active and not paused."""
+        self._refresh_playback_state()
         return self._playing and not self._paused
+
+    def _refresh_playback_state(self) -> None:
+        """Detect natural song end from the audio backend."""
+        if not self._playing or self._paused:
+            return
+        if self._audio_player.is_active():
+            return
+        self._ended_position_ms = self.position_ms
+        self._playing = False
 
     def load(self, song: SongConfig) -> None:
         """Load a song without starting playback."""
@@ -67,6 +78,7 @@ class SongManager:
             raise RuntimeError(message)
 
         self._start_offset_ms = max(start_ms, 0)
+        self._ended_position_ms = None
         self._playing = True
         self._paused = False
         self._started_at_s = self._clock()
@@ -102,6 +114,7 @@ class SongManager:
         self._paused_at_s = None
         self._paused_total_s = 0.0
         self._start_offset_ms = 0
+        self._ended_position_ms = None
 
     def close(self) -> None:
         """Release playback resources."""
@@ -111,6 +124,8 @@ class SongManager:
     @property
     def position_ms(self) -> int:
         """Return the current playback position in milliseconds."""
+        if self._ended_position_ms is not None:
+            return self._ended_position_ms
         if not self._playing or self._started_at_s is None:
             return 0
 

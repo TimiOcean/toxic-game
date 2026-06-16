@@ -172,3 +172,63 @@ def test_game_over_stops_song() -> None:
     assert snapshot.game_over is True
     assert snapshot.health == 0
     assert song.stop_called is True
+
+
+def test_solo_mode_ignores_p2_miss_health_penalty() -> None:
+    song = ScriptedSongManager()
+    game = GameManager(
+        song_manager=song,  # type: ignore[arg-type]
+        button_manager=ScriptedButtons([ButtonPresses(p1=False, p2=False)]),  # type: ignore[arg-type]
+        led_output=SimLedOutput(),
+        gameplay=_gameplay_config(),
+        led=_led_config(),
+        runtime=RuntimeConfig(update_hz=60),
+        solo_mode=True,
+    )
+    game.start(notes_p1=(), notes_p2=(_note(player=2, hit_ms=1000),))
+    song.position_ms = 1100
+    snapshot = game.tick()
+
+    assert snapshot.error_count == 1
+    assert snapshot.health == 20
+    assert snapshot.game_over is False
+
+
+def test_solo_mode_ignores_p2_bad_press_health_penalty() -> None:
+    song = ScriptedSongManager()
+    buttons = ScriptedButtons([ButtonPresses(p1=False, p2=True)])
+    game = GameManager(
+        song_manager=song,  # type: ignore[arg-type]
+        button_manager=buttons,  # type: ignore[arg-type]
+        led_output=SimLedOutput(),
+        gameplay=_gameplay_config(),
+        led=_led_config(),
+        runtime=RuntimeConfig(update_hz=60),
+        solo_mode=True,
+    )
+    game.start(notes_p1=(), notes_p2=(_note(player=2, hit_ms=1000),))
+    song.position_ms = 800
+    snapshot = game.tick()
+
+    assert snapshot.error_count == 1
+    assert snapshot.health == 20
+
+
+def test_solo_mode_still_applies_p2_good_hits() -> None:
+    song = ScriptedSongManager()
+    buttons = ScriptedButtons([ButtonPresses(p1=False, p2=True)])
+    game = GameManager(
+        song_manager=song,  # type: ignore[arg-type]
+        button_manager=buttons,  # type: ignore[arg-type]
+        led_output=SimLedOutput(),
+        gameplay=_gameplay_config(start_health=19),
+        led=_led_config(),
+        runtime=RuntimeConfig(update_hz=60),
+        solo_mode=True,
+    )
+    game.start(notes_p1=(), notes_p2=(_note(player=2, hit_ms=1000),))
+    song.position_ms = 1040
+    snapshot = game.tick()
+
+    assert snapshot.good_count == 1
+    assert snapshot.health == 20

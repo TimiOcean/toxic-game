@@ -25,22 +25,40 @@ class RecordingAudioPlayer(NoOpAudioPlayer):
     """Capture audio player calls for assertions."""
 
     def __init__(self) -> None:
+        super().__init__()
         self.play_calls: list[tuple[Path, int]] = []
         self.pause_count = 0
         self.resume_count = 0
         self.stop_count = 0
 
     def play(self, audio_path: Path, *, start_ms: int = 0) -> None:
+        super().play(audio_path, start_ms=start_ms)
         self.play_calls.append((audio_path, start_ms))
 
     def pause(self) -> None:
+        super().pause()
         self.pause_count += 1
 
     def resume(self) -> None:
+        super().resume()
         self.resume_count += 1
 
     def stop(self) -> None:
+        super().stop()
         self.stop_count += 1
+
+
+class ControllableAudioPlayer(NoOpAudioPlayer):
+    """Audio player with an overridable active state for transport tests."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.force_active: bool | None = None
+
+    def is_active(self) -> bool:
+        if self.force_active is not None:
+            return self.force_active
+        return super().is_active()
 
 
 @pytest.fixture
@@ -126,3 +144,17 @@ def test_stop_resets_position(demo_song: SongConfig) -> None:
 
     assert manager.position_ms == 0
     assert manager.is_playing is False
+
+
+def test_is_playing_false_when_audio_finishes(demo_song: SongConfig) -> None:
+    clock = FakeClock()
+    audio = ControllableAudioPlayer()
+    manager = SongManager(audio_player=audio, clock=clock)
+    manager.load(demo_song)
+    manager.play()
+
+    clock.now_s = 2.5
+    audio.force_active = False
+
+    assert manager.is_playing is False
+    assert manager.position_ms == 2500

@@ -37,10 +37,11 @@ def ensure_dummy_taps(song_dir: Path, *, bars: int = 16) -> None:
 def run_game_check(
     *,
     song_id: str,
-    duration_s: float,
+    duration_s: float | None,
     start_ms: int,
     make_dummy_taps: bool,
     sim_led: bool,
+    solo_mode: bool,
 ) -> int:
     """Run the integrated game loop using real audio, GPIO, and LEDs."""
     song = load_song_by_id(song_id)
@@ -76,6 +77,7 @@ def run_game_check(
         gameplay=build_gameplay_config(),
         led=build_led_config(),
         runtime=build_runtime_config(),
+        solo_mode=solo_mode,
     )
     game.start(notes_p1=notes.player1, notes_p2=notes.player2, start_ms=start_ms)
     snapshot = game.run(max_duration_s=duration_s)
@@ -106,8 +108,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--duration",
         type=float,
-        default=30.0,
-        help="Maximum runtime in seconds.",
+        default=None,
+        help="Optional max runtime in seconds (default: until song ends).",
     )
     parser.add_argument(
         "--start-ms",
@@ -125,6 +127,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Use in-memory LED output instead of physical strip (no root needed).",
     )
+    parser.add_argument(
+        "--solo",
+        action="store_true",
+        help="1-player debug: P2 errors do not reduce shared health.",
+    )
     return parser
 
 
@@ -139,6 +146,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             start_ms=args.start_ms,
             make_dummy_taps=args.dummy_taps,
             sim_led=args.sim_led,
+            solo_mode=args.solo,
         )
     except KeyboardInterrupt:
         sys.stdout.write("Interrupted by user\n")

@@ -49,6 +49,7 @@ class GameManager:
         gameplay: GameplayConfig,
         led: LedConfig,
         runtime: RuntimeConfig,
+        solo_mode: bool = False,
     ) -> None:
         self._song_manager = song_manager
         self._button_manager = button_manager or ButtonManager()
@@ -56,6 +57,7 @@ class GameManager:
         self._gameplay = gameplay
         self._led = led
         self._runtime = runtime
+        self._solo_mode = solo_mode
 
         self._pending_p1: tuple[ResolvedNote, ...] = ()
         self._pending_p2: tuple[ResolvedNote, ...] = ()
@@ -123,15 +125,22 @@ class GameManager:
                 judgement=Judgement.ERROR,
                 started_ms=now_ms,
             )
-            self._apply_judgement(Judgement.ERROR)
+            self._apply_judgement(Judgement.ERROR, player=note.player)
 
-    def _apply_judgement(self, judgement: Judgement | None) -> None:
+    def _apply_judgement(self, judgement: Judgement | None, *, player: int) -> None:
         if judgement == Judgement.PERFECT:
             self._perfect_count += 1
         elif judgement == Judgement.GOOD:
             self._good_count += 1
         elif judgement == Judgement.ERROR:
             self._error_count += 1
+
+        if (
+            self._solo_mode
+            and player == 2
+            and judgement == Judgement.ERROR
+        ):
+            return
 
         self._health_state = apply_judgement(
             state=self._health_state,
@@ -161,7 +170,7 @@ class GameManager:
                 judgement=result.judgement,
                 started_ms=press_ms,
             )
-            self._apply_judgement(result.judgement)
+            self._apply_judgement(result.judgement, player=player)
 
     def tick(self) -> GameSnapshot:
         """Advance gameplay by one frame."""

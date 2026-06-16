@@ -29,6 +29,9 @@ class MixerMusicProtocol(Protocol):
     def stop(self) -> None:
         """Stop playback."""
 
+    def get_busy(self) -> bool:
+        """Return True while audio is actively playing."""
+
 
 class MixerProtocol(Protocol):
     """Subset of pygame.mixer used by the backend audio player."""
@@ -63,25 +66,43 @@ class AudioPlayer(Protocol):
     def close(self) -> None:
         """Release playback resources."""
 
+    def is_active(self) -> bool:
+        """Return True while the backend is playing or paused mid-track."""
+
 
 class NoOpAudioPlayer:
     """Fallback audio player used when backend playback is unavailable."""
 
+    def __init__(self) -> None:
+        self._active = False
+        self._paused = False
+
     def play(self, audio_path: Path, *, start_ms: int = 0) -> None:
         """Ignore playback requests."""
         _ = (audio_path, start_ms)
+        self._active = True
+        self._paused = False
 
     def pause(self) -> None:
         """Ignore pause requests."""
+        self._paused = True
 
     def resume(self) -> None:
         """Ignore resume requests."""
+        self._paused = False
 
     def stop(self) -> None:
         """Ignore stop requests."""
+        self._active = False
+        self._paused = False
 
     def close(self) -> None:
         """Ignore close requests."""
+        self.stop()
+
+    def is_active(self) -> bool:
+        """Return True until :meth:`stop` or :meth:`close`."""
+        return self._active
 
 
 class PygameAudioPlayer:
@@ -144,3 +165,11 @@ class PygameAudioPlayer:
             return
         self.stop()
         self._mixer.quit()
+
+    def is_active(self) -> bool:
+        """Return True while pygame is playing or paused mid-track."""
+        if self._mixer is None:
+            return False
+        if self._paused:
+            return True
+        return bool(self._mixer.music.get_busy())

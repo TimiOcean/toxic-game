@@ -12,10 +12,13 @@ def test_noop_audio_player_accepts_calls(tmp_path: Path) -> None:
     audio_path = tmp_path / "track.ogg"
     audio_path.write_bytes(b"fake")
 
+    assert player.is_active() is False
     player.play(audio_path, start_ms=100)
+    assert player.is_active() is True
     player.pause()
     player.resume()
     player.stop()
+    assert player.is_active() is False
     player.close()
 
 
@@ -39,6 +42,9 @@ def test_pygame_audio_player_without_pygame(tmp_path: Path, monkeypatch) -> None
         def stop(self) -> None:
             return None
 
+        def get_busy(self) -> bool:
+            return False
+
     class FakeMixer:
         music = FakeMusic()
 
@@ -58,7 +64,9 @@ def test_pygame_audio_player_without_pygame(tmp_path: Path, monkeypatch) -> None
     player = PygameAudioPlayer()
 
     player.play(audio_path)
+    assert player.is_active() is False
     player.pause()
+    assert player.is_active() is True
     player.resume()
     player.stop()
     player.close()
