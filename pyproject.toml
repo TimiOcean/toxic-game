@@ -21,6 +21,7 @@ pi = [
 tg-led = "toxic_game.tools.led_check:main"
 tg-button = "toxic_game.tools.button_check:main"
 tg-audio = "toxic_game.tools.audio_check:main"
+tg-game = "toxic_game.tools.game_check:main"
 
 [build-system]
 requires = ["hatchling>=1.25.0"]
