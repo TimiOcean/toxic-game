@@ -23,6 +23,7 @@ tg-button = "toxic_game.tools.button_check:main"
 tg-audio = "toxic_game.tools.audio_check:main"
 tg-game = "toxic_game.tools.game_check:main"
 tg-song-config = "toxic_game.tools.song_config_tool:main"
+tg-tap-record = "toxic_game.tools.tap_record:main"
 
 [build-system]
 requires = ["hatchling>=1.25.0"]
