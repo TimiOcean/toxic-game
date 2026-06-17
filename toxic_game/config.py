@@ -10,6 +10,8 @@ from typing import Literal
 
 InputType = Literal["button", "jumppad"]
 _VALID_INPUT_TYPES = frozenset({"button", "jumppad"})
+RunningLightSpawn = Literal["end", "center"]
+_VALID_RUNNING_LIGHT_SPAWN = frozenset({"end", "center"})
 
 
 def repo_root_dir() -> Path:
@@ -64,6 +66,7 @@ class LedConfig:
     running_light_span: int
     rgbw_byte_order: str
     hit_marker_fraction: float
+    running_light_spawn: RunningLightSpawn
 
     @property
     def total_count(self) -> int:
@@ -304,6 +307,11 @@ def _build_led_config(led_table: dict[str, object]) -> LedConfig:
         message = "rgbw_count must be >= 1"
         raise ValueError(message)
 
+    running_light_spawn = _read_str(led_table, "running_light_spawn", "end")
+    if running_light_spawn not in _VALID_RUNNING_LIGHT_SPAWN:
+        message = f"invalid running_light_spawn: {running_light_spawn!r} (expected end or center)"
+        raise ValueError(message)
+
     return LedConfig(
         muted_rgb_count=muted_rgb_count,
         rgbw_count=rgbw_count,
@@ -317,6 +325,7 @@ def _build_led_config(led_table: dict[str, object]) -> LedConfig:
         running_light_span=_read_int(led_table, "running_light_span", 4),
         rgbw_byte_order=_read_str(led_table, "rgbw_byte_order", "WRGB"),
         hit_marker_fraction=_read_float(led_table, "hit_marker_fraction", 0.10),
+        running_light_spawn=running_light_spawn,  # type: ignore[arg-type]
     )
 
 

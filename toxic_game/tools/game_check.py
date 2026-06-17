@@ -6,6 +6,7 @@ import argparse
 import os
 import sys
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 
 from toxic_game.config import build_gameplay_config, build_led_config, build_runtime_config
@@ -34,6 +35,9 @@ def ensure_dummy_taps(song_dir: Path, *, bars: int = 16) -> None:
     _write_dummy_taps(song_dir / "p2.taps", bars=bars, lane_offset=2)
 
 
+SEPARATED_LIGHTS_SPAWN = "center"
+
+
 def run_game_check(
     *,
     song_id: str,
@@ -42,6 +46,7 @@ def run_game_check(
     make_dummy_taps: bool,
     sim_led: bool,
     solo_mode: bool,
+    separated_lights: bool,
 ) -> int:
     """Run the integrated game loop using real audio, GPIO, and LEDs."""
     song = load_song_by_id(song_id)
@@ -70,12 +75,18 @@ def run_game_check(
 
     song_manager = SongManager(audio_player=PygameAudioPlayer())
     song_manager.load(song)
+    led_config = build_led_config()
+    if separated_lights:
+        led_config = replace(
+            led_config,
+            running_light_spawn=SEPARATED_LIGHTS_SPAWN,  # type: ignore[arg-type]
+        )
     game = GameManager(
         song_manager=song_manager,
         button_manager=ButtonManager(),
         led_output=led_output,
         gameplay=build_gameplay_config(),
-        led=build_led_config(),
+        led=led_config,
         runtime=build_runtime_config(),
         solo_mode=solo_mode,
     )
@@ -132,6 +143,14 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="1-player debug: P2 errors do not reduce shared health.",
     )
+    parser.add_argument(
+        "--separated-lights",
+        action="store_true",
+        help=(
+            "Spawn running lights at strip center and travel to side markers "
+            "(magenta left, cyan right)."
+        ),
+    )
     return parser
 
 
@@ -147,6 +166,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             make_dummy_taps=args.dummy_taps,
             sim_led=args.sim_led,
             solo_mode=args.solo,
+            separated_lights=args.separated_lights,
         )
     except KeyboardInterrupt:
         sys.stdout.write("Interrupted by user\n")

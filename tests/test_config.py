@@ -95,6 +95,15 @@ def test_pong_defaults(tmp_path: Path) -> None:
     assert config.pong.sfx.pitch_randomize == 0.05
 
 
+def test_led_running_light_spawn_default(tmp_path: Path) -> None:
+    config_path = tmp_path / "empty.toml"
+    config_path.write_text("", encoding="utf-8")
+
+    config = load_app_config(config_path)
+
+    assert config.led.running_light_spawn == "end"
+
+
 def test_pong_sfx_paths_resolved_relative_to_config(tmp_path: Path) -> None:
     config_path = tmp_path / "cfg.toml"
     config_path.write_text(
@@ -122,6 +131,20 @@ first_server = 3
     )
 
     with pytest.raises(ValueError, match="first_server"):
+        load_app_config(config_path)
+
+
+def test_invalid_running_light_spawn_rejected(tmp_path: Path) -> None:
+    config_path = tmp_path / "bad.toml"
+    config_path.write_text(
+        """
+[led]
+running_light_spawn = "middle"
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="running_light_spawn"):
         load_app_config(config_path)
 
 

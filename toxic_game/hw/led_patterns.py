@@ -40,6 +40,7 @@ def _place_span(
     color: RgbPixel,
     travel_right_to_left: bool,
     brightness_ramp: bool,
+    travel_brightness: float | None = None,
     beat_pulse: float = 1.0,
 ) -> None:
     count = len(pixels)
@@ -55,7 +56,9 @@ def _place_span(
         end = min(head_index + span - 1, count - 1)
         progress = head_index / max(count - 1, 1)
 
-    if brightness_ramp:
+    if travel_brightness is not None:
+        brightness = min(max(travel_brightness, 0.0), 1.0)
+    elif brightness_ramp:
         brightness = min(max(progress, 0.0), 1.0)
     else:
         brightness = 1.0
@@ -77,6 +80,7 @@ def player1_chase_pixels(
     span: int,
     *,
     brightness_ramp: bool = True,
+    travel_brightness: float | None = None,
     beat_pulse: float = 1.0,
 ) -> tuple[RgbPixel, ...]:
     """Magenta running light traveling right to left."""
@@ -89,6 +93,7 @@ def player1_chase_pixels(
         color=MAGENTA,
         travel_right_to_left=True,
         brightness_ramp=brightness_ramp,
+        travel_brightness=travel_brightness,
         beat_pulse=beat_pulse,
     )
     return tuple(pixels)
@@ -100,6 +105,7 @@ def player2_chase_pixels(
     span: int,
     *,
     brightness_ramp: bool = True,
+    travel_brightness: float | None = None,
     beat_pulse: float = 1.0,
 ) -> tuple[RgbPixel, ...]:
     """Cyan running light traveling left to right."""
@@ -112,6 +118,7 @@ def player2_chase_pixels(
         color=CYAN,
         travel_right_to_left=False,
         brightness_ramp=brightness_ramp,
+        travel_brightness=travel_brightness,
         beat_pulse=beat_pulse,
     )
     return tuple(pixels)

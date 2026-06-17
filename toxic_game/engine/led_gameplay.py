@@ -71,6 +71,19 @@ def hit_marker_range(
     return start, end
 
 
+def center_spawn_head_index(
+    *,
+    strip_len: int,
+    span: int,
+    player: PlayerId,
+) -> int:
+    """Return the chase head index that centers a running light on the strip."""
+    center = (strip_len - 1) / 2
+    if player == 1:
+        return round(center + (span - 1) / 2)
+    return round(center - (span - 1) / 2)
+
+
 def _travel_ratio(
     *,
     progress_ms: int,
@@ -152,24 +165,43 @@ def _note_travel_pixels(
 
     if note.player == 1:
         marker_head = marker_end
+    else:
+        marker_head = marker_start
+
+    if led.running_light_spawn == "center":
+        spawn_head = center_spawn_head_index(
+            strip_len=strip_len,
+            span=span,
+            player=note.player,  # type: ignore[arg-type]
+        )
+        head_index = round(spawn_head + ratio * (marker_head - spawn_head))
+        chase_kwargs = {
+            "brightness_ramp": False,
+            "travel_brightness": ratio,
+            "beat_pulse": beat_pulse,
+        }
+    elif note.player == 1:
         max_step = max((strip_len - 1) - marker_head, 0)
         head_index = (strip_len - 1) - round(ratio * max_step)
+        chase_kwargs = {"brightness_ramp": True, "beat_pulse": beat_pulse}
+    else:
+        max_step = max(marker_head, 0)
+        head_index = round(ratio * max_step)
+        chase_kwargs = {"brightness_ramp": True, "beat_pulse": beat_pulse}
+
+    if note.player == 1:
         return player1_chase_pixels(
             strip_len,
             head_index,
             span,
-            brightness_ramp=True,
-            beat_pulse=beat_pulse,
+            **chase_kwargs,
         )
 
-    max_step = max(marker_start, 0)
-    head_index = round(ratio * max_step)
     return player2_chase_pixels(
         strip_len,
         head_index,
         span,
-        brightness_ramp=True,
-        beat_pulse=beat_pulse,
+        **chase_kwargs,
     )
 
 

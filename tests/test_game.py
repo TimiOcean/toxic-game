@@ -91,6 +91,7 @@ def _led_config() -> LedConfig:
         running_light_span=2,
         rgbw_byte_order="WRGB",
         hit_marker_fraction=0.10,
+        running_light_spawn="end",
     )
 
 

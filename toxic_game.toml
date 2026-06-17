@@ -24,6 +24,7 @@ channel = 0
 hit_flash_ms = 500
 running_light_span = 2
 hit_marker_fraction = 0.10
+running_light_spawn = "center"  # "center" = spawn mid-strip, travel to side marker; or tg-game --separated-lights
 rgbw_byte_order = "WRGB"
 
 [gameplay]

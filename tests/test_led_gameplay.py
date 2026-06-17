@@ -7,6 +7,7 @@ from toxic_game.engine.led_frames import CYAN, GOLD, MAGENTA, OFF, RED, WHITE, s
 from toxic_game.engine.led_gameplay import (
     HitFeedback,
     build_gameplay_frame,
+    center_spawn_head_index,
     hit_marker_range,
 )
 from toxic_game.engine.notes import ResolvedNote
@@ -36,6 +37,7 @@ def _led_config(**overrides: object) -> LedConfig:
         "running_light_span": 4,
         "rgbw_byte_order": "WRGB",
         "hit_marker_fraction": 0.10,
+        "running_light_spawn": "end",
     }
     defaults.update(overrides)
     return LedConfig(**defaults)  # type: ignore[arg-type]
@@ -146,6 +148,59 @@ def test_p1_gets_brighter_toward_hit() -> None:
     early_peak = max(sum(pixel) for pixel in early.pixels)
     late_peak = max(sum(pixel) for pixel in late.pixels)
     assert late_peak > early_peak
+
+
+def test_center_spawn_p1_starts_at_middle_not_right_end() -> None:
+    note = _p1_note(hit_ms=1000, spawn_ms=0)
+    led = _led_config(running_light_spawn="center")
+    strip_len = 20
+    span = 4
+    spawn_head = center_spawn_head_index(strip_len=strip_len, span=span, player=1)
+    frame = _frame(strip_len=strip_len, span=span, notes=(note,), led=led)
+
+    assert frame.pixels[-1] == OFF
+    assert frame.pixels[spawn_head] == OFF
+
+    mid_travel = _frame(
+        progress_ms=500,
+        strip_len=strip_len,
+        span=span,
+        notes=(note,),
+        led=led,
+    )
+    assert mid_travel.pixels[-1] == OFF
+    left_half = mid_travel.pixels[: strip_len // 2]
+    assert any(pixel != OFF for pixel in left_half)
+    assert all(pixel == OFF or sum(pixel) <= sum(MAGENTA) for pixel in left_half)
+
+
+def test_center_spawn_p1_reaches_marker_at_hit() -> None:
+    note = _p1_note(hit_ms=1000, spawn_ms=0)
+    frame = _frame(
+        progress_ms=1000,
+        notes=(note,),
+        led=_led_config(running_light_spawn="center"),
+    )
+
+    marker_start, marker_end = hit_marker_range(player=1, strip_len=10, span=4, fraction=0.10)
+    for index in range(marker_start, marker_end + 1):
+        assert frame.pixels[index] != OFF
+        assert sum(frame.pixels[index]) > sum(scale_pixel(MAGENTA, 0.15))
+
+
+def test_center_spawn_p2_starts_at_middle_not_left_end() -> None:
+    note = _p2_note(hit_ms=1000, spawn_ms=0)
+    led = _led_config(running_light_spawn="center")
+    spawn_head = center_spawn_head_index(strip_len=10, span=4, player=2)
+    mid_travel = _frame(progress_ms=500, notes=(note,), led=led)
+
+    assert mid_travel.pixels[0] == OFF
+    assert mid_travel.pixels[spawn_head] != OFF
+
+
+def test_center_spawn_head_index_centers_the_span() -> None:
+    assert center_spawn_head_index(strip_len=10, span=4, player=1) == 6
+    assert center_spawn_head_index(strip_len=10, span=4, player=2) == 3
 
 
 def test_perfect_feedback_is_white_burst() -> None:
