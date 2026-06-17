@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import importlib
 from typing import TYPE_CHECKING, Protocol
 
-from toxic_game.hw.audio_device import configure_headphone_audio
+from toxic_game.hw.audio_device import ensure_pygame_mixer
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -110,25 +109,14 @@ class PygameAudioPlayer:
 
     def __init__(self) -> None:
         """Initialize pygame.mixer when available."""
-        configure_headphone_audio()
         self._mixer = self._load_mixer()
         self._paused = False
 
     def _load_mixer(self) -> MixerProtocol | None:
-        try:
-            pygame = importlib.import_module("pygame")
-        except ImportError:
-            return None
-
-        mixer = getattr(pygame, "mixer", None)
+        mixer = ensure_pygame_mixer()
         if mixer is None:
             return None
-        try:
-            if not mixer.get_init():
-                mixer.init()
-        except Exception:  # noqa: BLE001
-            return None
-        return mixer
+        return mixer  # type: ignore[return-value]
 
     def play(self, audio_path: Path, *, start_ms: int = 0) -> None:
         """Start playback from the requested millisecond offset."""

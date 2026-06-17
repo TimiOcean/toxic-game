@@ -14,7 +14,7 @@ from collections.abc import Callable, Sequence
 from typing import Literal, Protocol
 
 from toxic_game.config import SfxConfig
-from toxic_game.hw.audio_device import configure_headphone_audio
+from toxic_game.hw.audio_device import ensure_pygame_mixer
 
 SfxEvent = Literal["hit", "perfect", "miss"]
 
@@ -128,7 +128,6 @@ class PygameSfxPlayer:
         rng: Callable[[], float] | None = None,
     ) -> None:
         """Load whatever sample files exist; missing ones stay silent."""
-        configure_headphone_audio()
         self._pitch_randomize = config.pitch_randomize
         self._rng = rng or random.random
         self._sounds: dict[SfxEvent, object] = {}
@@ -155,13 +154,8 @@ class PygameSfxPlayer:
             pygame = importlib.import_module("pygame")
         except ImportError:
             return None
-        mixer = getattr(pygame, "mixer", None)
+        mixer = ensure_pygame_mixer()
         if mixer is None:
-            return None
-        try:
-            if not mixer.get_init():
-                mixer.init()
-        except Exception:  # noqa: BLE001
             return None
         self._pygame = pygame
         self._sndarray = getattr(pygame, "sndarray", None)

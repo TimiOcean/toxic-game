@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+import importlib
 import os
 import re
 from pathlib import Path
 
 _HEADPHONE_LINE_PATTERN = re.compile(r"^\s*(\d+)\s+\[([^\]]+)\]")
+
+# Default pygame buffer (512 samples) is too small on Raspberry Pi and often
+# causes ALSA underruns / crackle on startup. 44.1 kHz stereo matches the
+# headphone DAC and most decoded assets.
+_MIXER_FREQUENCY_HZ = 44100
+_MIXER_BUFFER_SAMPLES = 2048
 
 
 def _device_from_cards_text(cards_text: str) -> str | None:
@@ -35,3 +42,50 @@ def configure_headphone_audio() -> str | None:
     if device is not None:
         os.environ["AUDIODEV"] = device
     return device
+
+
+def _warmup_mixer(mixer: object, sound_factory: object) -> None:
+    """Prime the output device with a short silent sample."""
+    try:
+        # ~10 ms of silence at 44.1 kHz, stereo 16-bit.
+        silent = sound_factory(buffer=b"\x00\x00" * 441)  # type: ignore[operator,call-arg]
+        silent.play()  # type: ignore[attr-defined]
+    except Exception:  # noqa: BLE001
+        return
+
+
+def ensure_pygame_mixer() -> object | None:
+    """Initialize pygame.mixer once with Pi-friendly settings.
+
+    Must be called (via :func:`configure_headphone_audio`) before pygame loads
+    the audio backend. Returns the mixer module, or ``None`` when unavailable.
+    """
+    configure_headphone_audio()
+    try:
+        pygame = importlib.import_module("pygame")
+    except ImportError:
+        return None
+
+    mixer = getattr(pygame, "mixer", None)
+    if mixer is None:
+        return None
+
+    try:
+        if not mixer.get_init():
+            mixer.init(
+                frequency=_MIXER_FREQUENCY_HZ,
+                size=-16,
+                channels=2,
+                buffer=_MIXER_BUFFER_SAMPLES,
+            )
+            sound_factory = getattr(mixer, "Sound", None)
+            if sound_factory is not None:
+                _warmup_mixer(mixer, sound_factory)
+        return mixer
+    except Exception:  # noqa: BLE001
+        try:
+            if not mixer.get_init():
+                mixer.init()
+            return mixer
+        except Exception:  # noqa: BLE001
+            return None
