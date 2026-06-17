@@ -20,6 +20,10 @@ def test_load_default_config() -> None:
     assert config.gpio.left_contact_pin == 17
     assert config.gpio.right_contact_pin == 27
     assert config.gpio.debounce_ms == 30
+    assert config.gpio.p1_input == "jumppad"
+    assert config.gpio.p2_input == "button"
+    assert config.gpio.jumppad.min_air_ms == 200
+    assert config.gpio.jumppad.retrigger_ms == 400
     assert config.led.muted_rgb_count == 60
     assert config.led.rgbw_count == 30
     assert config.led.pin == 10
@@ -69,4 +73,18 @@ rgbw_count = 0
     )
 
     with pytest.raises(ValueError, match="rgbw_count"):
+        load_app_config(config_path)
+
+
+def test_invalid_input_type_rejected(tmp_path: Path) -> None:
+    config_path = tmp_path / "bad.toml"
+    config_path.write_text(
+        """
+[gpio]
+p1_input = "switch"
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="invalid p1_input"):
         load_app_config(config_path)

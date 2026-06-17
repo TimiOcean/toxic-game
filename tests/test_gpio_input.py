@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from toxic_game.config import GpioConfig, clear_config_cache
+from toxic_game.config import GpioConfig, JumppadConfig, clear_config_cache
 from toxic_game.hw import gpio_input
 
 
@@ -51,7 +51,14 @@ def test_read_button_states_uses_active_low_pull_up(
     monkeypatch.setattr(
         gpio_input,
         "build_gpio_config",
-        lambda: GpioConfig(left_contact_pin=17, right_contact_pin=27, debounce_ms=30),
+        lambda: GpioConfig(
+            left_contact_pin=17,
+            right_contact_pin=27,
+            debounce_ms=30,
+            p1_input="button",
+            p2_input="button",
+            jumppad=JumppadConfig(min_air_ms=200, retrigger_ms=400),
+        ),
     )
 
     assert gpio_input.read_button_states() == {"left": True, "right": False}

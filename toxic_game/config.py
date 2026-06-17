@@ -6,6 +6,10 @@ import tomllib
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
+from typing import Literal
+
+InputType = Literal["button", "jumppad"]
+_VALID_INPUT_TYPES = frozenset({"button", "jumppad"})
 
 
 def repo_root_dir() -> Path:
@@ -25,12 +29,23 @@ class PathConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class JumppadConfig:
+    """Timing rules for jumppad landing detection."""
+
+    min_air_ms: int
+    retrigger_ms: int
+
+
+@dataclass(frozen=True, slots=True)
 class GpioConfig:
-    """GPIO input pin assignments."""
+    """GPIO input pin assignments and per-player input mode."""
 
     left_contact_pin: int
     right_contact_pin: int
     debounce_ms: int
+    p1_input: InputType
+    p2_input: InputType
+    jumppad: JumppadConfig
 
 
 @dataclass(frozen=True, slots=True)
@@ -203,6 +218,36 @@ def _build_health(table: dict[str, object]) -> HealthConfig:
     )
 
 
+def _build_jumppad_config(table: dict[str, object]) -> JumppadConfig:
+    jumppad_table = _read_toml_table(table, "jumppad")
+    min_air_ms = _read_int(jumppad_table, "min_air_ms", 200)
+    retrigger_ms = _read_int(jumppad_table, "retrigger_ms", 400)
+    if min_air_ms < 0:
+        message = "jumppad min_air_ms must be >= 0"
+        raise ValueError(message)
+    if retrigger_ms < 0:
+        message = "jumppad retrigger_ms must be >= 0"
+        raise ValueError(message)
+    return JumppadConfig(min_air_ms=min_air_ms, retrigger_ms=retrigger_ms)
+
+
+def _build_gpio_config(gpio_table: dict[str, object]) -> GpioConfig:
+    p1_input = _read_str(gpio_table, "p1_input", "button")
+    p2_input = _read_str(gpio_table, "p2_input", "button")
+    for name, value in (("p1_input", p1_input), ("p2_input", p2_input)):
+        if value not in _VALID_INPUT_TYPES:
+            message = f"invalid {name}: {value!r} (expected button or jumppad)"
+            raise ValueError(message)
+    return GpioConfig(
+        left_contact_pin=_read_int(gpio_table, "left_contact_pin", 17),
+        right_contact_pin=_read_int(gpio_table, "right_contact_pin", 27),
+        debounce_ms=_read_int(gpio_table, "debounce_ms", 30),
+        p1_input=p1_input,  # type: ignore[arg-type]
+        p2_input=p2_input,  # type: ignore[arg-type]
+        jumppad=_build_jumppad_config(gpio_table),
+    )
+
+
 def _build_led_config(led_table: dict[str, object]) -> LedConfig:
     muted_rgb_count = _read_int(led_table, "muted_rgb_count", 0)
     legacy_count = led_table.get("count")
@@ -255,11 +300,7 @@ def _load_app_config_cached(config_path: Path) -> AppConfig:
             repo_root=repo_root_dir(),
             songs_dir=_read_path(config_dir, paths_table, "songs_dir", "songs"),
         ),
-        gpio=GpioConfig(
-            left_contact_pin=_read_int(gpio_table, "left_contact_pin", 17),
-            right_contact_pin=_read_int(gpio_table, "right_contact_pin", 27),
-            debounce_ms=_read_int(gpio_table, "debounce_ms", 30),
-        ),
+        gpio=_build_gpio_config(gpio_table),
         led=_build_led_config(led_table),
         gameplay=GameplayConfig(
             lead_time_beats=_read_int(gameplay_table, "lead_time_beats", 4),

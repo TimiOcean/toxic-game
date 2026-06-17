@@ -5,6 +5,12 @@ songs_dir = "songs"
 left_contact_pin = 17
 right_contact_pin = 27
 debounce_ms = 30
+p1_input = "jumppad"
+p2_input = "button"
+
+[gpio.jumppad]
+min_air_ms = 200
+retrigger_ms = 400
 
 [led]
 muted_rgb_count = 60   # n: leading physical RGB LEDs (always off)

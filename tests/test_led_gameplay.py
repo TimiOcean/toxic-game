@@ -124,13 +124,19 @@ def test_running_light_pulses_on_beat() -> None:
 def test_p1_travel_starts_on_right_end() -> None:
     frame = _frame(notes=(_p1_note(hit_ms=1000, spawn_ms=0),))
 
-    assert frame.pixels[-1] != OFF
+    assert frame.pixels[-1] == OFF
+
+    early_travel = _frame(progress_ms=200, notes=(_p1_note(hit_ms=1000, spawn_ms=0),))
+    assert early_travel.pixels[-1] != OFF
 
 
 def test_p2_travel_starts_on_left_end() -> None:
     frame = _frame(notes=(_p2_note(hit_ms=1000, spawn_ms=0),))
 
-    assert frame.pixels[0] != OFF
+    assert frame.pixels[0] == OFF
+
+    early_travel = _frame(progress_ms=200, notes=(_p2_note(hit_ms=1000, spawn_ms=0),))
+    assert early_travel.pixels[0] != OFF
 
 
 def test_p1_gets_brighter_toward_hit() -> None:

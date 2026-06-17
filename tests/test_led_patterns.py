@@ -25,8 +25,16 @@ def test_walk_pixel_moves_left_to_right() -> None:
 def test_player1_chase_starts_on_right_end() -> None:
     pixels = player1_chase_pixels(count=10, head_index=9, span=4)
 
-    assert pixels[-1] != OFF
+    assert pixels[-1] == OFF
     assert pixels[0] == OFF
+
+
+def test_player1_chase_spawn_end_is_dark_until_travel_begins() -> None:
+    spawn = player1_chase_pixels(count=10, head_index=9, span=1)
+    traveling = player1_chase_pixels(count=10, head_index=7, span=1)
+
+    assert spawn[-1] == OFF
+    assert sum(traveling[7]) > 0
 
 
 def test_player1_chase_ends_on_left_end() -> None:
@@ -59,7 +67,7 @@ def test_player1_chase_has_soft_edge_pixels() -> None:
 def test_player2_chase_starts_on_left_end() -> None:
     pixels = player2_chase_pixels(count=10, head_index=0, span=4)
 
-    assert pixels[0] != OFF
+    assert pixels[0] == OFF
     assert pixels[-1] == OFF
 
 

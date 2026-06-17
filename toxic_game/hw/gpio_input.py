@@ -67,7 +67,11 @@ def _side_pin(side: ButtonSide) -> int:
 
 
 def read_button_states() -> dict[ButtonSide, bool]:
-    """Return the pressed state for each player button (active-low)."""
+    """Return whether each contact is closed (active-low, pull-up wiring).
+
+    For momentary buttons this is the pressed state. For jumppads this is the
+    landed/connected state (player standing on the pad).
+    """
     gpio = _load_gpio_module()
     if gpio is None:
         return {"left": False, "right": False}

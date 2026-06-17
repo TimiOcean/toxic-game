@@ -61,10 +61,12 @@ def run_button_check(
     state_reader = reader or CallableButtonReader(read_button_states)
     poller = manager or ButtonManager(reader=state_reader)
     stdout(
-        "Polling player buttons "
-        f"(P1 pin={gpio_config.left_contact_pin}, "
-        f"P2 pin={gpio_config.right_contact_pin}, "
-        f"debounce_ms={gpio_config.debounce_ms})\n",
+        "Polling player inputs "
+        f"(P1 pin={gpio_config.left_contact_pin} {gpio_config.p1_input}, "
+        f"P2 pin={gpio_config.right_contact_pin} {gpio_config.p2_input}, "
+        f"debounce_ms={gpio_config.debounce_ms}, "
+        f"jumppad min_air_ms={gpio_config.jumppad.min_air_ms}, "
+        f"retrigger_ms={gpio_config.jumppad.retrigger_ms})\n",
     )
     if not gpio_is_available():
         stdout(

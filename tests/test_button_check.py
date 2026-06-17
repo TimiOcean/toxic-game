@@ -2,13 +2,30 @@
 
 from __future__ import annotations
 
+from toxic_game.config import GpioConfig, JumppadConfig
 from toxic_game.engine.button_manager import ButtonManager, ButtonPresses, SimButtonReader
 from toxic_game.tools.button_check import ButtonCheckOptions, run_button_check
 
 
+def _button_gpio_config() -> GpioConfig:
+    return GpioConfig(
+        left_contact_pin=17,
+        right_contact_pin=27,
+        debounce_ms=30,
+        p1_input="button",
+        p2_input="button",
+        jumppad=JumppadConfig(min_air_ms=200, retrigger_ms=400),
+    )
+
+
 def test_run_button_check_runs_multiple_samples() -> None:
     reader = SimButtonReader({"left": False, "right": False})
-    manager = ButtonManager(reader=reader, debounce_ms=0, clock_ms=lambda: 1000)
+    manager = ButtonManager(
+        reader=reader,
+        gpio_config=_button_gpio_config(),
+        debounce_ms=0,
+        clock_ms=lambda: 1000,
+    )
     poll_count = {"n": 0}
 
     def count_poll() -> ButtonPresses:
@@ -32,7 +49,12 @@ def test_run_button_check_runs_multiple_samples() -> None:
 
 def test_run_button_check_prints_press_events() -> None:
     reader = SimButtonReader({"left": False, "right": False})
-    manager = ButtonManager(reader=reader, debounce_ms=0, clock_ms=lambda: 1000)
+    manager = ButtonManager(
+        reader=reader,
+        gpio_config=_button_gpio_config(),
+        debounce_ms=0,
+        clock_ms=lambda: 1000,
+    )
     messages: list[str] = []
 
     def advance() -> None:

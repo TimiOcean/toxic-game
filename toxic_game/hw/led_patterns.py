@@ -56,7 +56,7 @@ def _place_span(
         progress = head_index / max(count - 1, 1)
 
     if brightness_ramp:
-        brightness = 0.15 + 0.85 * min(max(progress, 0.0), 1.0)
+        brightness = min(max(progress, 0.0), 1.0)
     else:
         brightness = 1.0
     brightness *= min(max(beat_pulse, 0.0), 1.0)

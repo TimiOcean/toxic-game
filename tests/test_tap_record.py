@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from toxic_game.config import GpioConfig, JumppadConfig
 from toxic_game.engine.button_manager import ButtonManager, SimButtonReader
 from toxic_game.engine.notes import load_tap_file
 from toxic_game.engine.song_config import SongConfig
@@ -41,6 +42,14 @@ def test_tap_recorder_captures_rising_edges() -> None:
     reader = SimButtonReader({"left": False, "right": False})
     buttons = ButtonManager(
         reader=reader,
+        gpio_config=GpioConfig(
+            left_contact_pin=17,
+            right_contact_pin=27,
+            debounce_ms=30,
+            p1_input="button",
+            p2_input="button",
+            jumppad=JumppadConfig(min_air_ms=200, retrigger_ms=400),
+        ),
         debounce_ms=0,
         clock_ms=lambda: int(clock_s[0] * 1000),
     )
