@@ -10,6 +10,7 @@ dev = [
     "pytest>=9.0.2",
 ]
 pi = [
+    "numpy>=2.0.0",
     "pygame>=2.6.1",
     "rpi-ws281x>=5.0.0",
     # On Raspberry Pi OS, RPi.GPIO is usually a system package
@@ -24,6 +25,7 @@ tg-audio = "toxic_game.tools.audio_check:main"
 tg-game = "toxic_game.tools.game_check:main"
 tg-song-config = "toxic_game.tools.song_config_tool:main"
 tg-tap-record = "toxic_game.tools.tap_record:main"
+tg-pong = "toxic_game.tools.pong_check:main"
 
 [build-system]
 requires = ["hatchling>=1.25.0"]

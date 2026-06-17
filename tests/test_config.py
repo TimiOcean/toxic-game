@@ -76,6 +76,55 @@ rgbw_count = 0
         load_app_config(config_path)
 
 
+def test_pong_defaults(tmp_path: Path) -> None:
+    config_path = tmp_path / "empty.toml"
+    config_path.write_text("", encoding="utf-8")
+
+    config = load_app_config(config_path)
+
+    assert config.pong.base_travel_ms == 1600
+    assert config.pong.continuous_multiplier == 1.06
+    assert config.pong.perfect_multiplier == 1.3
+    assert config.pong.serve_delay_ms == 700
+    assert config.pong.lives == 3
+    assert config.pong.first_server == 1
+    assert config.pong.auto_perfect_chance == 0.10
+    assert config.pong.sfx.hit is None
+    assert config.pong.sfx.perfect is None
+    assert config.pong.sfx.miss is None
+    assert config.pong.sfx.pitch_randomize == 0.05
+
+
+def test_pong_sfx_paths_resolved_relative_to_config(tmp_path: Path) -> None:
+    config_path = tmp_path / "cfg.toml"
+    config_path.write_text(
+        """
+[pong.sfx]
+hit = "sfx/hit.wav"
+""",
+        encoding="utf-8",
+    )
+
+    config = load_app_config(config_path)
+
+    assert config.pong.sfx.hit == (tmp_path / "sfx" / "hit.wav").resolve()
+    assert config.pong.sfx.perfect is None
+
+
+def test_invalid_pong_first_server_rejected(tmp_path: Path) -> None:
+    config_path = tmp_path / "bad.toml"
+    config_path.write_text(
+        """
+[pong]
+first_server = 3
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="first_server"):
+        load_app_config(config_path)
+
+
 def test_invalid_input_type_rejected(tmp_path: Path) -> None:
     config_path = tmp_path / "bad.toml"
     config_path.write_text(

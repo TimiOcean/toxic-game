@@ -130,6 +130,30 @@ class RuntimeConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class SfxConfig:
+    """Optional sound-effect file paths. ``None`` means the effect is silent."""
+
+    hit: Path | None
+    perfect: Path | None
+    miss: Path | None
+    pitch_randomize: float
+
+
+@dataclass(frozen=True, slots=True)
+class PongConfig:
+    """Tuning for the Pong game mode."""
+
+    base_travel_ms: int
+    continuous_multiplier: float
+    perfect_multiplier: float
+    serve_delay_ms: int
+    lives: int
+    first_server: int
+    auto_perfect_chance: float
+    sfx: SfxConfig
+
+
+@dataclass(frozen=True, slots=True)
 class AppConfig:
     """Top-level application configuration."""
 
@@ -138,6 +162,7 @@ class AppConfig:
     led: LedConfig
     gameplay: GameplayConfig
     runtime: RuntimeConfig
+    pong: PongConfig
 
 
 def _resolve_config_path(path: str | Path | None) -> Path:
@@ -191,6 +216,20 @@ def _read_path(
     raw_value = table.get(key, default)
     if not isinstance(raw_value, str):
         raw_value = default
+    candidate = Path(raw_value).expanduser()
+    if candidate.is_absolute():
+        return candidate
+    return (config_dir / candidate).resolve()
+
+
+def _read_optional_path(
+    config_dir: Path,
+    table: dict[str, object],
+    key: str,
+) -> Path | None:
+    raw_value = table.get(key)
+    if not isinstance(raw_value, str) or not raw_value.strip():
+        return None
     candidate = Path(raw_value).expanduser()
     if candidate.is_absolute():
         return candidate
@@ -281,6 +320,61 @@ def _build_led_config(led_table: dict[str, object]) -> LedConfig:
     )
 
 
+def _build_pong_config(
+    config_dir: Path,
+    pong_table: dict[str, object],
+) -> PongConfig:
+    base_travel_ms = _read_int(pong_table, "base_travel_ms", 1600)
+    continuous_multiplier = _read_float(pong_table, "continuous_multiplier", 1.06)
+    perfect_multiplier = _read_float(pong_table, "perfect_multiplier", 1.3)
+    serve_delay_ms = _read_int(pong_table, "serve_delay_ms", 700)
+    lives = _read_int(pong_table, "lives", 3)
+    first_server = _read_int(pong_table, "first_server", 1)
+    auto_perfect_chance = _read_float(pong_table, "auto_perfect_chance", 0.10)
+
+    if base_travel_ms < 1:
+        message = "pong base_travel_ms must be >= 1"
+        raise ValueError(message)
+    if continuous_multiplier <= 0 or perfect_multiplier <= 0:
+        message = "pong multipliers must be > 0"
+        raise ValueError(message)
+    if serve_delay_ms < 0:
+        message = "pong serve_delay_ms must be >= 0"
+        raise ValueError(message)
+    if lives < 1:
+        message = "pong lives must be >= 1"
+        raise ValueError(message)
+    if first_server not in {1, 2}:
+        message = "pong first_server must be 1 or 2"
+        raise ValueError(message)
+    if not 0.0 <= auto_perfect_chance <= 1.0:
+        message = "pong auto_perfect_chance must be between 0 and 1"
+        raise ValueError(message)
+
+    sfx_table = _read_toml_table(pong_table, "sfx")
+    pitch_randomize = _read_float(sfx_table, "pitch_randomize", 0.05)
+    if not 0.0 <= pitch_randomize <= 1.0:
+        message = "pong.sfx pitch_randomize must be between 0 and 1"
+        raise ValueError(message)
+    sfx = SfxConfig(
+        hit=_read_optional_path(config_dir, sfx_table, "hit"),
+        perfect=_read_optional_path(config_dir, sfx_table, "perfect"),
+        miss=_read_optional_path(config_dir, sfx_table, "miss"),
+        pitch_randomize=pitch_randomize,
+    )
+
+    return PongConfig(
+        base_travel_ms=base_travel_ms,
+        continuous_multiplier=continuous_multiplier,
+        perfect_multiplier=perfect_multiplier,
+        serve_delay_ms=serve_delay_ms,
+        lives=lives,
+        first_server=first_server,
+        auto_perfect_chance=auto_perfect_chance,
+        sfx=sfx,
+    )
+
+
 @cache
 def _load_app_config_cached(config_path: Path) -> AppConfig:
     config_dir = config_path.parent
@@ -294,6 +388,7 @@ def _load_app_config_cached(config_path: Path) -> AppConfig:
     led_table = _read_toml_table(document, "led")
     gameplay_table = _read_toml_table(document, "gameplay")
     runtime_table = _read_toml_table(document, "runtime")
+    pong_table = _read_toml_table(document, "pong")
 
     return AppConfig(
         paths=PathConfig(
@@ -310,6 +405,7 @@ def _load_app_config_cached(config_path: Path) -> AppConfig:
         runtime=RuntimeConfig(
             update_hz=_read_int(runtime_table, "update_hz", 60),
         ),
+        pong=_build_pong_config(config_dir, pong_table),
     )
 
 
@@ -346,3 +442,8 @@ def build_gameplay_config(path: str | Path | None = None) -> GameplayConfig:
 def build_runtime_config(path: str | Path | None = None) -> RuntimeConfig:
     """Return runtime loop configuration."""
     return load_app_config(path).runtime
+
+
+def build_pong_config(path: str | Path | None = None) -> PongConfig:
+    """Return Pong game-mode configuration."""
+    return load_app_config(path).pong

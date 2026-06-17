@@ -117,6 +117,39 @@ def player2_chase_pixels(
     return tuple(pixels)
 
 
+def chase_pixels(
+    count: int,
+    head_index: int,
+    span: int,
+    color: RgbPixel,
+    *,
+    travel_right_to_left: bool,
+    brightness_ramp: bool = True,
+    beat_pulse: float = 1.0,
+) -> tuple[RgbPixel, ...]:
+    """Render a running light of an arbitrary color at ``head_index``.
+
+    Generic counterpart to :func:`player1_chase_pixels` /
+    :func:`player2_chase_pixels` for callers (e.g. Pong) that need a freely
+    chosen color instead of the fixed magenta/cyan player lights.
+    """
+    pixels = blank_pixels(count)
+    if travel_right_to_left:
+        clamped_head = max(span - 1, min(head_index, count - 1))
+    else:
+        clamped_head = max(0, min(head_index, count - span))
+    _place_span(
+        pixels,
+        head_index=clamped_head,
+        span=span,
+        color=color,
+        travel_right_to_left=travel_right_to_left,
+        brightness_ramp=brightness_ramp,
+        beat_pulse=beat_pulse,
+    )
+    return tuple(pixels)
+
+
 def dual_chase_pixels(
     count: int,
     step: int,

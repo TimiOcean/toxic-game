@@ -6,15 +6,15 @@ left_contact_pin = 17
 right_contact_pin = 27
 debounce_ms = 30
 p1_input = "jumppad"
-p2_input = "button"
+p2_input = "jumppad"
 
 [gpio.jumppad]
 min_air_ms = 200
 retrigger_ms = 400
 
 [led]
-muted_rgb_count = 60   # n: leading physical RGB LEDs (always off)
-rgbw_count = 30        # m: active RGBW gameplay LEDs
+muted_rgb_count = 4   # n: leading physical RGB LEDs (always off)
+rgbw_count = 70     # m: active RGBW gameplay LEDs
 pin = 10               # SPI MOSI (physical pin 19); use with 3.5mm audio
 freq_hz = 800000
 dma = 10
@@ -42,3 +42,19 @@ gain_on_perfect = 2
 
 [runtime]
 update_hz = 60
+
+[pong]
+base_travel_ms = 1600        # marker-to-marker time at base speed
+continuous_multiplier = 1.06 # speed-up applied on each hit within a rally
+perfect_multiplier = 1.3     # extra speed for the next traversal after a perfect
+serve_delay_ms = 700         # pause after a miss before the next serve
+lives = 3                    # lives per player; 0 -> game over
+first_server = 1             # player who serves first (1 or 2)
+auto_perfect_chance = 0.10   # solo/demo auto player's chance of a perfect return
+
+[pong.sfx]
+# Optional WAV/OGG paths (relative to this file). Missing files are ignored.
+hit = "pong.mp3"
+perfect = "perfect_pong.mp3"
+miss = "pong miss.mp3"
+pitch_randomize = 0.10  # randomize pitch by up to ±5% on each play (0 = off)
