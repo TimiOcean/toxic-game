@@ -13,10 +13,12 @@ from toxic_game.config import build_gameplay_config, build_led_config, build_run
 from toxic_game.engine.button_manager import ButtonManager
 from toxic_game.engine.game import GameManager
 from toxic_game.engine.notes import load_song_notes
+from toxic_game.engine.score_animation import leds_to_light, run_score_animation
 from toxic_game.engine.song_config import load_song_by_id, resolve_song_dir
 from toxic_game.engine.song_manager import SongManager
 from toxic_game.hw.audio_playback import PygameAudioPlayer
 from toxic_game.hw.led_output import NoOpLedOutput, Ws2811LedOutput
+from toxic_game.hw.sfx import NoOpSfxPlayer, build_sfx_player
 
 INTERRUPTED_EXIT_CODE = 130
 
@@ -47,6 +49,7 @@ def run_game_check(
     sim_led: bool,
     solo_mode: bool,
     separated_lights: bool,
+    mute: bool,
 ) -> int:
     """Run the integrated game loop using real audio, GPIO, and LEDs."""
     song = load_song_by_id(song_id)
@@ -75,6 +78,7 @@ def run_game_check(
 
     song_manager = SongManager(audio_player=PygameAudioPlayer())
     song_manager.load(song)
+    gameplay_config = build_gameplay_config()
     led_config = build_led_config()
     if separated_lights:
         led_config = replace(
@@ -85,28 +89,42 @@ def run_game_check(
         song_manager=song_manager,
         button_manager=ButtonManager(),
         led_output=led_output,
-        gameplay=build_gameplay_config(),
+        gameplay=gameplay_config,
         led=led_config,
         runtime=build_runtime_config(),
         solo_mode=solo_mode,
     )
     game.start(notes_p1=notes.player1, notes_p2=notes.player2, start_ms=start_ms)
     snapshot = game.run(max_duration_s=duration_s)
-    song_manager.close()
 
+    p1_pct, p2_pct = game.final_percentages()
     sys.stdout.write(
         (
             "done "
             f"pos={snapshot.position_ms}ms "
-            f"health={snapshot.health} "
+            f"score_p1={snapshot.score_p1} "
+            f"score_p2={snapshot.score_p2} "
             f"perfect={snapshot.perfect_count} "
             f"good={snapshot.good_count} "
             f"error={snapshot.error_count} "
             f"pending_p1={snapshot.pending_p1} "
             f"pending_p2={snapshot.pending_p2} "
-            f"game_over={snapshot.game_over}\n"
+            f"pct_p1={p1_pct}% "
+            f"pct_p2={p2_pct}%\n"
         ),
     )
+
+    sfx = NoOpSfxPlayer() if mute else build_sfx_player(gameplay_config.sfx)
+    half_len = led_config.active_count // 2
+    run_score_animation(
+        led_output=led_output,
+        sfx=sfx,
+        strip_len=led_config.active_count,
+        p1_target=leds_to_light(p1_pct, half_len),
+        p2_target=leds_to_light(p2_pct, half_len),
+        step_ms=gameplay_config.score_step_ms,
+    )
+    song_manager.close()
     return 0
 
 
@@ -151,6 +169,11 @@ def _build_parser() -> argparse.ArgumentParser:
             "(magenta left, cyan right)."
         ),
     )
+    parser.add_argument(
+        "--mute",
+        action="store_true",
+        help="Disable the score-reveal chime sound effect.",
+    )
     return parser
 
 
@@ -167,6 +190,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             sim_led=args.sim_led,
             solo_mode=args.solo,
             separated_lights=args.separated_lights,
+            mute=args.mute,
         )
     except KeyboardInterrupt:
         sys.stdout.write("Interrupted by user\n")

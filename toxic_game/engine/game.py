@@ -1,4 +1,9 @@
-"""Main gameplay manager wiring song, input, scoring, health, and LEDs."""
+"""Main gameplay manager wiring song, input, score, and LEDs.
+
+The rhythm jump game is score-based: 3 points for a perfect hit, 1 for a good
+hit (configurable). There is no shared health and no game over; the match ends
+after a fixed duration or when the song finishes.
+"""
 
 from __future__ import annotations
 
@@ -8,9 +13,9 @@ from typing import Protocol
 
 from toxic_game.config import GameplayConfig, LedConfig, RuntimeConfig
 from toxic_game.engine.button_manager import ButtonManager, ButtonPresses
-from toxic_game.engine.health import HealthState, apply_judgement, make_health_state
 from toxic_game.engine.led_gameplay import HitFeedback, build_gameplay_frame, feedback_duration_ms
 from toxic_game.engine.notes import ResolvedNote
+from toxic_game.engine.score_animation import score_percentage
 from toxic_game.engine.scoring import Judgement, evaluate_press, pop_missed_notes
 from toxic_game.engine.song_manager import SongManager
 from toxic_game.hw.led_output import LedOutput
@@ -28,8 +33,9 @@ class GameSnapshot:
     """One tick of gameplay state."""
 
     position_ms: int
-    health: int
-    game_over: bool
+    score_p1: int
+    score_p2: int
+    finished: bool
     perfect_count: int
     good_count: int
     error_count: int
@@ -38,7 +44,7 @@ class GameSnapshot:
 
 
 class GameManager:
-    """Coordinate song time, input scoring, health, and LED output."""
+    """Coordinate song time, input scoring, and LED output."""
 
     def __init__(
         self,
@@ -62,11 +68,13 @@ class GameManager:
         self._pending_p1: tuple[ResolvedNote, ...] = ()
         self._pending_p2: tuple[ResolvedNote, ...] = ()
         self._feedback: list[HitFeedback] = []
-        self._health_state: HealthState = make_health_state(gameplay.health)
-        self._perfect_count = 0
-        self._good_count = 0
+        self._score: dict[int, int] = {1: 0, 2: 0}
+        self._perfect: dict[int, int] = {1: 0, 2: 0}
+        self._good: dict[int, int] = {1: 0, 2: 0}
         self._error_count = 0
-        self._game_over = False
+        self._total_p1 = 0
+        self._total_p2 = 0
+        self._finished = False
 
     def start(
         self,
@@ -78,12 +86,14 @@ class GameManager:
         """Start gameplay with the provided resolved notes."""
         self._pending_p1 = tuple(sorted(notes_p1, key=lambda note: note.hit_ms))
         self._pending_p2 = tuple(sorted(notes_p2, key=lambda note: note.hit_ms))
+        self._total_p1 = len(self._pending_p1)
+        self._total_p2 = len(self._pending_p2)
         self._feedback = []
-        self._health_state = make_health_state(self._gameplay.health)
-        self._perfect_count = 0
-        self._good_count = 0
+        self._score = {1: 0, 2: 0}
+        self._perfect = {1: 0, 2: 0}
+        self._good = {1: 0, 2: 0}
         self._error_count = 0
-        self._game_over = False
+        self._finished = False
         self._song_manager.play(start_ms=start_ms)
 
     def _prune_feedback(self, *, now_ms: int) -> None:
@@ -120,36 +130,23 @@ class GameManager:
             windows=self._gameplay.judgement_windows_ms,
         )
         for note in (*missed_p1, *missed_p2):
+            # Misses keep the red feedback flash but do not change the score.
             self._add_feedback(
                 player=note.player,
                 judgement=Judgement.ERROR,
                 started_ms=now_ms,
             )
-            self._apply_judgement(Judgement.ERROR, player=note.player)
+            self._error_count += 1
 
     def _apply_judgement(self, judgement: Judgement | None, *, player: int) -> None:
         if judgement == Judgement.PERFECT:
-            self._perfect_count += 1
+            self._perfect[player] += 1
+            self._score[player] += self._gameplay.score_perfect
         elif judgement == Judgement.GOOD:
-            self._good_count += 1
+            self._good[player] += 1
+            self._score[player] += self._gameplay.score_good
         elif judgement == Judgement.ERROR:
             self._error_count += 1
-
-        if (
-            self._solo_mode
-            and player == 2
-            and judgement == Judgement.ERROR
-        ):
-            return
-
-        self._health_state = apply_judgement(
-            state=self._health_state,
-            judgement=judgement,
-            config=self._gameplay.health,
-        )
-        self._game_over = self._health_state.is_game_over
-        if self._game_over:
-            self._song_manager.stop()
 
     def _handle_press(self, *, player: int, press_ms: int) -> None:
         pending = self._pending_p1 if player == 1 else self._pending_p2
@@ -172,18 +169,30 @@ class GameManager:
             )
             self._apply_judgement(result.judgement, player=player)
 
+    def _snapshot(self, now_ms: int) -> GameSnapshot:
+        return GameSnapshot(
+            position_ms=now_ms,
+            score_p1=self._score[1],
+            score_p2=self._score[2],
+            finished=self._finished,
+            perfect_count=self._perfect[1] + self._perfect[2],
+            good_count=self._good[1] + self._good[2],
+            error_count=self._error_count,
+            pending_p1=len(self._pending_p1),
+            pending_p2=len(self._pending_p2),
+        )
+
     def tick(self) -> GameSnapshot:
         """Advance gameplay by one frame."""
         now_ms = self._song_manager.position_ms
         self._prune_feedback(now_ms=now_ms)
 
         self._consume_misses(now_ms=now_ms)
-        if not self._game_over:
-            presses = self._button_manager.poll()
-            if presses.p1:
-                self._handle_press(player=1, press_ms=now_ms)
-            if presses.p2:
-                self._handle_press(player=2, press_ms=now_ms)
+        presses = self._button_manager.poll()
+        if presses.p1:
+            self._handle_press(player=1, press_ms=now_ms)
+        if presses.p2:
+            self._handle_press(player=2, press_ms=now_ms)
 
         frame = build_gameplay_frame(
             strip_len=self._led.active_count,
@@ -195,29 +204,41 @@ class GameManager:
             timing=self._song_manager.timing,
         )
         self._led_output.write_frame(frame)
-        return GameSnapshot(
-            position_ms=now_ms,
-            health=self._health_state.value,
-            game_over=self._game_over,
-            perfect_count=self._perfect_count,
-            good_count=self._good_count,
-            error_count=self._error_count,
-            pending_p1=len(self._pending_p1),
-            pending_p2=len(self._pending_p2),
+        return self._snapshot(now_ms)
+
+    def final_percentages(self) -> tuple[int, int]:
+        """Return the (player 1, player 2) score percentages, each capped at 100."""
+        p1 = score_percentage(
+            perfect=self._perfect[1],
+            good=self._good[1],
+            total_notes=self._total_p1,
+            score_perfect=self._gameplay.score_perfect,
+            score_good=self._gameplay.score_good,
         )
+        p2 = score_percentage(
+            perfect=self._perfect[2],
+            good=self._good[2],
+            total_notes=self._total_p2,
+            score_perfect=self._gameplay.score_perfect,
+            score_good=self._gameplay.score_good,
+        )
+        return (p1, p2)
 
     def run(self, *, max_duration_s: float | None = None) -> GameSnapshot:
-        """Run the live game loop until song end, game over, or max duration."""
+        """Run the live game loop until song end or the configured duration."""
         tick_s = 1.0 / max(self._runtime.update_hz, 1)
-        deadline = (
-            time.monotonic() + max_duration_s
+        duration = (
+            max_duration_s
             if max_duration_s is not None
-            else None
+            else float(self._gameplay.duration_s)
         )
+        deadline = time.monotonic() + duration if duration > 0 else None
         snapshot = self.tick()
-        while self._song_manager.is_playing and not snapshot.game_over:
+        while self._song_manager.is_playing:
             if deadline is not None and time.monotonic() >= deadline:
                 break
             time.sleep(tick_s)
             snapshot = self.tick()
-        return snapshot
+        self._finished = True
+        self._song_manager.stop()
+        return self._snapshot(snapshot.position_ms)

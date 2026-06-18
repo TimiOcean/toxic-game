@@ -124,6 +124,11 @@ def _feedback_pixels(
     return tuple(pixels)
 
 
+def build_flash_frame(strip_len: int, color: RgbPixel) -> LedFrame:
+    """Return a frame with every gameplay LED set to ``color``."""
+    return build_frame([color for _ in range(strip_len)])
+
+
 def build_pong_frame(
     *,
     strip_len: int,

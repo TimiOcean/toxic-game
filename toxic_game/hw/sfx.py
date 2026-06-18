@@ -16,7 +16,7 @@ from typing import Literal, Protocol
 from toxic_game.config import SfxConfig
 from toxic_game.hw.audio_device import ensure_pygame_mixer
 
-SfxEvent = Literal["hit", "perfect", "miss"]
+SfxEvent = Literal["hit", "perfect", "miss", "applause", "chime"]
 
 
 class SfxPlayer(Protocol):
@@ -140,6 +140,8 @@ class PygameSfxPlayer:
             "hit": config.hit,
             "perfect": config.perfect,
             "miss": config.miss,
+            "applause": config.applause,
+            "chime": config.chime,
         }
         for event, path in sources.items():
             if path is None:

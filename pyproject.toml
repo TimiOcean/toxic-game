@@ -26,6 +26,7 @@ tg-game = "toxic_game.tools.game_check:main"
 tg-song-config = "toxic_game.tools.song_config_tool:main"
 tg-tap-record = "toxic_game.tools.tap_record:main"
 tg-pong = "toxic_game.tools.pong_check:main"
+tg-arcade = "toxic_game.tools.arcade:main"
 
 [build-system]
 requires = ["hatchling>=1.25.0"]

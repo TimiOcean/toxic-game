@@ -1,7 +1,8 @@
 """Pong game mode: a single bouncing running light between the two markers.
 
-Reuses the rhythm game's input (:class:`ButtonManager`), scoring windows
-(:func:`evaluate_press`), marker geometry, and LED output. The rhythm
+Reuses the rhythm game's input (:class:`ButtonManager`), marker geometry, and
+LED output. Unlike the rhythm game, hits are judged by the LED *distance*
+between the ball and the receiver's marker (not by time windows). The rhythm
 gameplay modules are imported read-only and are not modified.
 """
 
@@ -15,16 +16,19 @@ from typing import Literal, Protocol
 
 from toxic_game.config import JudgementWindowsMs, LedConfig, PongConfig, RuntimeConfig
 from toxic_game.engine.button_manager import ButtonManager, ButtonPresses
-from toxic_game.engine.led_frames import CYAN, MAGENTA, RgbPixel, WHITE
-from toxic_game.engine.notes import ResolvedNote
-from toxic_game.engine.pong_led import ball_index_for_player, build_pong_frame
-from toxic_game.engine.scoring import Judgement, evaluate_press
+from toxic_game.engine.led_frames import CYAN, MAGENTA, OFF, RgbPixel, WHITE, scale_pixel
+from toxic_game.engine.pong_led import (
+    ball_index_for_player,
+    build_flash_frame,
+    build_pong_frame,
+)
+from toxic_game.engine.scoring import Judgement
 from toxic_game.hw.led_output import LedOutput
 from toxic_game.hw.sfx import NoOpSfxPlayer, SfxPlayer
 
 PlayerId = Literal[1, 2]
 
-PongState = Literal["rally", "serve_delay", "game_over"]
+PongState = Literal["rally", "point_flash", "gameover_flash", "game_over"]
 
 _PLAYER_COLORS: dict[PlayerId, RgbPixel] = {1: MAGENTA, 2: CYAN}
 
@@ -86,7 +90,7 @@ class PongManager:
         self._button_manager = button_manager or ButtonManager()
         self._led_output = led_output
         self._led = led
-        self._windows = windows
+        self._windows = windows  # unused: Pong judges by LED distance
         self._pong = pong
         self._runtime = runtime
         self._sfx = sfx or NoOpSfxPlayer()
@@ -103,13 +107,20 @@ class PongManager:
         self._to_player: PlayerId = _other(self._from_player)
         self._seg_start_ms = 0
         self._arrival_ms = 0
+        self._from_index = 0
+        self._to_index = 0
+        self._end_index = 0
+        self._direction = 1
+        self._speed_leds_per_ms = 0.0
         self._ball_color: RgbPixel = WHITE
         self._returned = False
         self._speed_level = 1.0
         self._perfect_active = False
-        self._state: PongState = "serve_delay"
-        self._serve_at_ms = 0
+        self._state: PongState = "rally"
         self._pending_server: PlayerId = pong.first_server  # type: ignore[assignment]
+        self._flash_color: RgbPixel = WHITE
+        self._flash_started_ms = 0
+        self._flash_until_ms = 0
         self._feedback: list[_Feedback] = []
 
         self._perfect_count = 0
@@ -144,7 +155,15 @@ class PongManager:
 
     def _begin_segment(self, now_ms: int, *, is_serve: bool) -> None:
         self._seg_start_ms = now_ms
-        self._arrival_ms = now_ms + self._travel_ms()
+        self._from_index = self._index_of(self._from_player)
+        self._to_index = self._index_of(self._to_player)
+        # The ball travels past the receiver marker toward that player's end.
+        self._end_index = 0 if self._to_player == 1 else self._strip_len - 1
+        self._direction = 1 if self._to_index >= self._from_index else -1
+        distance = abs(self._to_index - self._from_index)
+        travel = self._travel_ms()
+        self._arrival_ms = now_ms + travel
+        self._speed_leds_per_ms = distance / travel if travel > 0 else float(distance)
         self._returned = False
         self._state = "rally"
         if is_serve:
@@ -157,6 +176,15 @@ class PongManager:
         self._perfect_active = False
         self._ball_color = WHITE
         self._begin_segment(now_ms, is_serve=True)
+
+    def _ball_position(self, now_ms: int) -> float:
+        elapsed = max(now_ms - self._seg_start_ms, 0)
+        position = self._from_index + self._direction * elapsed * self._speed_leds_per_ms
+        return min(max(position, 0.0), float(self._strip_len - 1))
+
+    def _overshoot(self, now_ms: int) -> float:
+        """LED distance the ball has travelled past the receiver marker (signed)."""
+        return self._direction * (self._ball_position(now_ms) - self._to_index)
 
     def _return_ball(
         self,
@@ -181,24 +209,40 @@ class PongManager:
         self._to_player = _other(receiver)
         self._begin_segment(now_ms, is_serve=False)
 
+    def _start_flash(
+        self,
+        *,
+        color: RgbPixel,
+        count: int,
+        now_ms: int,
+    ) -> None:
+        self._flash_color = color
+        self._flash_started_ms = now_ms
+        self._flash_until_ms = now_ms + count * 2 * self._pong.flash_ms
+
     def _register_miss(self, receiver: PlayerId, now_ms: int) -> None:
         self._miss_count += 1
         self._lives[receiver] = max(0, self._lives[receiver] - 1)
         self._sfx.play("miss")
-        self._feedback.append(
-            _Feedback(player=receiver, judgement=Judgement.ERROR, started_ms=now_ms),
-        )
-        # Park the ball at the misser's side for the serve delay.
-        self._from_player = receiver
-        self._to_player = _other(receiver)
-        self._ball_color = WHITE
         self._returned = True
+        winner = _other(receiver)
+        winner_color = _PLAYER_COLORS[winner]
         if self._lives[receiver] <= 0:
-            self._state = "game_over"
+            self._sfx.play("applause")
+            self._start_flash(
+                color=winner_color,
+                count=self._pong.gameover_flash_count,
+                now_ms=now_ms,
+            )
+            self._state = "gameover_flash"
             return
         self._pending_server = receiver
-        self._serve_at_ms = now_ms + self._pong.serve_delay_ms
-        self._state = "serve_delay"
+        self._start_flash(
+            color=winner_color,
+            count=self._pong.point_flash_count,
+            now_ms=now_ms,
+        )
+        self._state = "point_flash"
 
     def _prune_feedback(self, now_ms: int) -> None:
         self._feedback = [
@@ -211,30 +255,23 @@ class PongManager:
         pressed = presses.p1 if self._to_player == 1 else presses.p2
         if not pressed:
             return
-        target = ResolvedNote(
-            player=self._to_player,
-            bar=1,
-            beat=1,
-            hit_ms=self._arrival_ms,
-            spawn_ms=self._seg_start_ms,
-        )
-        result = evaluate_press(
-            notes=(target,),
-            press_ms=now_ms,
-            windows=self._windows,
-        )
-        if result.judgement in (Judgement.PERFECT, Judgement.GOOD):
-            self._return_ball(self._to_player, result.judgement, now_ms)
+        distance = abs(self._ball_position(now_ms) - self._to_index)
+        if distance <= self._pong.perfect_distance_leds:
+            judgement = Judgement.PERFECT
+        elif distance <= self._pong.good_distance_leds:
+            judgement = Judgement.GOOD
+        else:
+            return  # mistimed press is ignored, no penalty
+        self._return_ball(self._to_player, judgement, now_ms)
 
     def _ball_head_index(self, now_ms: int) -> int:
-        from_index = self._index_of(self._from_player)
-        to_index = self._index_of(self._to_player)
-        if self._state != "rally":
-            return from_index
-        travel = max(self._arrival_ms - self._seg_start_ms, 1)
-        ratio = (now_ms - self._seg_start_ms) / travel
-        ratio = min(max(ratio, 0.0), 1.0)
-        return round(from_index + (to_index - from_index) * ratio)
+        if self._state in ("point_flash", "gameover_flash", "game_over"):
+            return self._index_of(self._from_player)
+        return round(self._ball_position(now_ms))
+
+    def _flash_on(self, now_ms: int) -> bool:
+        elapsed = max(now_ms - self._flash_started_ms, 0)
+        return (elapsed // max(self._pong.flash_ms, 1)) % 2 == 0
 
     def tick(self) -> PongSnapshot:
         """Advance Pong by one frame and render it."""
@@ -244,12 +281,15 @@ class PongManager:
         # Always poll so button edge tracking stays current.
         presses = self._button_manager.poll()
 
-        if self._state == "serve_delay" and now_ms >= self._serve_at_ms:
-            self._serve(self._pending_server, now_ms=now_ms)
-
-        if self._state == "rally":
+        if self._state == "point_flash":
+            if now_ms >= self._flash_until_ms:
+                self._serve(self._pending_server, now_ms=now_ms)
+        elif self._state == "gameover_flash":
+            if now_ms >= self._flash_until_ms:
+                self._state = "game_over"
+        elif self._state == "rally":
             if self._to_player in self._auto_players:
-                if not self._returned and now_ms >= self._arrival_ms:
+                if not self._returned and self._overshoot(now_ms) >= 0:
                     judgement = (
                         Judgement.PERFECT
                         if self._rng() < self._pong.auto_perfect_chance
@@ -262,7 +302,7 @@ class PongManager:
             if (
                 self._state == "rally"
                 and not self._returned
-                and now_ms > self._arrival_ms + self._windows.good
+                and self._overshoot(now_ms) > self._pong.good_distance_leds
             ):
                 self._register_miss(self._to_player, now_ms)
 
@@ -270,12 +310,20 @@ class PongManager:
         return self._snapshot(now_ms)
 
     def _render(self, now_ms: int) -> None:
+        if self._state in ("point_flash", "gameover_flash"):
+            color = (
+                scale_pixel(self._flash_color, self._pong.point_flash_intensity)
+                if self._flash_on(now_ms)
+                else OFF
+            )
+            self._led_output.write_frame(build_flash_frame(self._strip_len, color))
+            return
+
         feedback = tuple(
             (flash.player, flash.judgement, now_ms - flash.started_ms)
             for flash in self._feedback
         )
         ball_visible = self._state != "game_over"
-        ball_parked = self._state == "serve_delay"
         frame = build_pong_frame(
             strip_len=self._strip_len,
             span=self._span,
@@ -283,7 +331,7 @@ class PongManager:
             ball_head_index=self._ball_head_index(now_ms),
             ball_color=self._ball_color,
             ball_visible=ball_visible,
-            ball_parked=ball_parked,
+            ball_parked=False,
             travel_right_to_left=self._to_player == 1,
             feedback=feedback,
         )

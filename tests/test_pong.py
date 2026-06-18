@@ -49,6 +49,17 @@ def _led_config(**overrides: object) -> LedConfig:
     return LedConfig(**defaults)  # type: ignore[arg-type]
 
 
+def _sfx_config() -> SfxConfig:
+    return SfxConfig(
+        hit=None,
+        perfect=None,
+        miss=None,
+        applause=None,
+        chime=None,
+        pitch_randomize=0.0,
+    )
+
+
 def _pong_config(**overrides: object) -> PongConfig:
     defaults = {
         "base_travel_ms": 1000,
@@ -58,7 +69,13 @@ def _pong_config(**overrides: object) -> PongConfig:
         "lives": 3,
         "first_server": 1,
         "auto_perfect_chance": 0.10,
-        "sfx": SfxConfig(hit=None, perfect=None, miss=None, pitch_randomize=0.0),
+        "perfect_distance_leds": 1,
+        "good_distance_leds": 3,
+        "point_flash_count": 2,
+        "point_flash_intensity": 0.15,
+        "gameover_flash_count": 2,
+        "flash_ms": 10,
+        "sfx": _sfx_config(),
     }
     defaults.update(overrides)
     return PongConfig(**defaults)  # type: ignore[arg-type]
@@ -129,7 +146,8 @@ def test_ball_turns_receiver_color_on_hit() -> None:
     manager, _ = _make_manager(clock=clock, reader=reader)
     manager.start()
 
-    # Ball arrives at P2 marker after base_travel_ms (1000) at speed 1.
+    # Ball reaches the P2 marker after base_travel_ms (1000); pressing on the
+    # marker is a perfect (distance 0) return.
     clock.now = 1000
     reader.states["right"] = True
     snapshot = manager.tick()
@@ -146,7 +164,7 @@ def test_perfect_hit_plays_perfect_sfx_and_speeds_up_next_traversal_only() -> No
     manager, _ = _make_manager(clock=clock, reader=reader, sfx=sfx)
     manager.start()
 
-    # Perfect return by P2 exactly on arrival.
+    # Perfect return by P2 on the marker (distance 0).
     clock.now = 1000
     reader.states["right"] = True
     manager.tick()
@@ -155,33 +173,34 @@ def test_perfect_hit_plays_perfect_sfx_and_speeds_up_next_traversal_only() -> No
     # continuous(2.0) * perfect(2.0) -> travel 1000/4 = 250ms back to P1.
     assert manager._arrival_ms - manager._seg_start_ms == 250  # noqa: SLF001
 
-    # P1 returns (good, pressing 100 ms late); perfect bonus gone.
+    # P1 returns within the good distance; perfect bonus is gone afterwards.
     reader.states["right"] = False
-    clock.now = 1350
+    clock.now = 1230
     reader.states["left"] = True
-    manager.tick()
+    snapshot = manager.tick()
+    assert snapshot.good_count == 1
     # speed_level now 2*2 = 4, no perfect factor -> 1000/4 = 250ms.
     assert manager._arrival_ms - manager._seg_start_ms == 250  # noqa: SLF001
 
 
-def test_miss_costs_a_life_and_resets_speed_on_serve() -> None:
+def test_miss_costs_a_life_and_enters_point_flash() -> None:
     clock = _ManualClock()
     reader = SimButtonReader({"left": False, "right": False})
     sfx = RecordingSfxPlayer()
     manager, _ = _make_manager(clock=clock, reader=reader, sfx=sfx)
     manager.start()
 
-    # P2 never presses; ball passes marker + good window -> miss.
-    clock.now = 1000 + 150 + 1
+    # P2 never presses; the ball overshoots the marker past the good distance.
+    clock.now = 1200
     snapshot = manager.tick()
 
     assert snapshot.lives_p2 == 2
     assert snapshot.miss_count == 1
-    assert snapshot.state == "serve_delay"
+    assert snapshot.state == "point_flash"
     assert "miss" in sfx.events
 
-    # After serve delay, misser (P2) serves; speed reset to base.
-    clock.now += 500
+    # After the point flash, the misser (P2) serves at base speed.
+    clock.now = 1200 + 2 * 2 * 10 + 5
     snapshot = manager.tick()
     assert snapshot.state == "rally"
     assert snapshot.from_player == 2
@@ -195,7 +214,7 @@ def test_mistimed_press_is_ignored() -> None:
     manager, _ = _make_manager(clock=clock, reader=reader)
     manager.start()
 
-    # Press way too early (outside good window) -> ignored, no return.
+    # Press way too early (far from the marker) -> ignored, no return.
     clock.now = 200
     reader.states["right"] = True
     snapshot = manager.tick()
@@ -212,17 +231,32 @@ def test_game_over_when_a_player_runs_out_of_lives() -> None:
     manager.start()
 
     snapshot = manager.tick()
-    for _ in range(20):  # nobody ever presses; misses alternate sides
-        clock.now = manager._arrival_ms + 150 + 1  # noqa: SLF001 force a miss
+    for _ in range(60):
+        clock.now += 3000  # force misses and run out flashes
         snapshot = manager.tick()
         if snapshot.game_over:
             break
-        clock.now += 500  # wait out serve delay
-        manager.tick()
 
     assert snapshot.game_over is True
     assert snapshot.state == "game_over"
     assert min(snapshot.lives_p1, snapshot.lives_p2) == 0
+
+
+def test_game_over_plays_applause() -> None:
+    clock = _ManualClock()
+    reader = SimButtonReader({"left": False, "right": False})
+    sfx = RecordingSfxPlayer()
+    manager, _ = _make_manager(clock=clock, reader=reader, sfx=sfx)
+    manager.start()
+
+    manager.tick()
+    for _ in range(60):
+        clock.now += 3000
+        snapshot = manager.tick()
+        if snapshot.game_over:
+            break
+
+    assert "applause" in sfx.events
 
 
 def test_solo_auto_player_always_returns() -> None:

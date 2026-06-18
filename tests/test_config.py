@@ -92,7 +92,66 @@ def test_pong_defaults(tmp_path: Path) -> None:
     assert config.pong.sfx.hit is None
     assert config.pong.sfx.perfect is None
     assert config.pong.sfx.miss is None
+    assert config.pong.sfx.applause is None
+    assert config.pong.sfx.chime is None
     assert config.pong.sfx.pitch_randomize == 0.05
+
+
+def test_pong_distance_and_flash_defaults(tmp_path: Path) -> None:
+    config_path = tmp_path / "empty.toml"
+    config_path.write_text("", encoding="utf-8")
+
+    config = load_app_config(config_path)
+
+    assert config.pong.perfect_distance_leds == 1
+    assert config.pong.good_distance_leds == 4
+    assert config.pong.point_flash_count == 5
+    assert config.pong.point_flash_intensity == 0.15
+    assert config.pong.gameover_flash_count == 10
+    assert config.pong.flash_ms == 150
+
+
+def test_gameplay_score_defaults(tmp_path: Path) -> None:
+    config_path = tmp_path / "empty.toml"
+    config_path.write_text("", encoding="utf-8")
+
+    config = load_app_config(config_path)
+
+    assert config.gameplay.duration_s == 60
+    assert config.gameplay.score_perfect == 3
+    assert config.gameplay.score_good == 1
+    assert config.gameplay.score_step_ms == 200
+    assert config.gameplay.sfx.chime is None
+
+
+def test_gameplay_sfx_path_resolved_relative_to_config(tmp_path: Path) -> None:
+    config_path = tmp_path / "cfg.toml"
+    config_path.write_text(
+        """
+[gameplay.sfx]
+chime = "sfx/chime.wav"
+""",
+        encoding="utf-8",
+    )
+
+    config = load_app_config(config_path)
+
+    assert config.gameplay.sfx.chime == (tmp_path / "sfx" / "chime.wav").resolve()
+
+
+def test_invalid_pong_distance_order_rejected(tmp_path: Path) -> None:
+    config_path = tmp_path / "bad.toml"
+    config_path.write_text(
+        """
+[pong]
+perfect_distance_leds = 5
+good_distance_leds = 2
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="good_distance_leds"):
+        load_app_config(config_path)
 
 
 def test_led_running_light_spawn_default(tmp_path: Path) -> None:

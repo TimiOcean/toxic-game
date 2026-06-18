@@ -10,6 +10,7 @@ from toxic_game.config import (
     JudgementWindowsMs,
     LedConfig,
     RuntimeConfig,
+    SfxConfig,
 )
 from toxic_game.engine.button_manager import ButtonPresses
 from toxic_game.engine.game import GameManager
@@ -63,17 +64,33 @@ def _note(*, player: int, hit_ms: int, spawn_ms: int = 0) -> ResolvedNote:
     )
 
 
-def _gameplay_config(*, start_health: int = 20) -> GameplayConfig:
+def _sfx_config() -> SfxConfig:
+    return SfxConfig(
+        hit=None,
+        perfect=None,
+        miss=None,
+        applause=None,
+        chime=None,
+        pitch_randomize=0.0,
+    )
+
+
+def _gameplay_config(*, duration_s: int = 60) -> GameplayConfig:
     return GameplayConfig(
         lead_time_beats=4,
         judgement_windows_ms=JudgementWindowsMs(perfect=20, good=50),
         health=HealthConfig(
-            start=start_health,
+            start=20,
             max=20,
             lose_on_error=2,
             gain_on_good=1,
             gain_on_perfect=2,
         ),
+        duration_s=duration_s,
+        score_perfect=3,
+        score_good=1,
+        score_step_ms=200,
+        sfx=_sfx_config(),
     )
 
 
@@ -134,7 +151,8 @@ def test_tick_scores_presses_and_misses() -> None:
     assert snapshot.perfect_count == 1
     assert snapshot.good_count == 1
     assert snapshot.error_count == 1
-    assert snapshot.health == 18
+    assert snapshot.score_p1 == 3  # one perfect, miss costs nothing
+    assert snapshot.score_p2 == 1  # one good
     assert snapshot.pending_p1 == 0
     assert snapshot.pending_p2 == 0
     assert len(led.frames) == 4
@@ -155,19 +173,20 @@ def test_ghost_tap_is_ignored_in_game_loop() -> None:
     song.position_ms = 500
     snapshot = game.tick()
 
-    assert snapshot.health == 20
+    assert snapshot.score_p1 == 0
+    assert snapshot.score_p2 == 0
     assert snapshot.perfect_count == 0
     assert snapshot.good_count == 0
     assert snapshot.error_count == 0
 
 
-def test_game_over_stops_song() -> None:
+def test_miss_never_ends_game() -> None:
     song = ScriptedSongManager()
     game = GameManager(
         song_manager=song,  # type: ignore[arg-type]
         button_manager=ScriptedButtons([ButtonPresses(p1=False, p2=False)]),  # type: ignore[arg-type]
         led_output=SimLedOutput(),
-        gameplay=_gameplay_config(start_health=2),
+        gameplay=_gameplay_config(),
         led=_led_config(),
         runtime=RuntimeConfig(update_hz=60),
     )
@@ -175,34 +194,39 @@ def test_game_over_stops_song() -> None:
     song.position_ms = 1100
     snapshot = game.tick()
 
-    assert snapshot.game_over is True
-    assert snapshot.health == 0
+    assert snapshot.error_count == 1
+    assert snapshot.score_p1 == 0
+    assert snapshot.finished is False
+    assert song.stop_called is False
+
+
+def test_run_finishes_and_stops_song() -> None:
+    song = ScriptedSongManager()
+    game = GameManager(
+        song_manager=song,  # type: ignore[arg-type]
+        button_manager=ScriptedButtons([]),  # type: ignore[arg-type]
+        led_output=SimLedOutput(),
+        gameplay=_gameplay_config(),
+        led=_led_config(),
+        runtime=RuntimeConfig(update_hz=60),
+    )
+    game.start(notes_p1=(), notes_p2=())
+    # Simulate the song reaching its natural end.
+    song.is_playing = False
+    snapshot = game.run()
+
+    assert snapshot.finished is True
     assert song.stop_called is True
 
 
-def test_solo_mode_ignores_p2_miss_health_penalty() -> None:
+def test_final_percentages_capped_at_100() -> None:
     song = ScriptedSongManager()
-    game = GameManager(
-        song_manager=song,  # type: ignore[arg-type]
-        button_manager=ScriptedButtons([ButtonPresses(p1=False, p2=False)]),  # type: ignore[arg-type]
-        led_output=SimLedOutput(),
-        gameplay=_gameplay_config(),
-        led=_led_config(),
-        runtime=RuntimeConfig(update_hz=60),
-        solo_mode=True,
+    buttons = ScriptedButtons(
+        [
+            ButtonPresses(p1=True, p2=False),   # p1 good at 1040 on note 1000
+            ButtonPresses(p1=False, p2=True),   # p2 perfect at 1000 on note 1000
+        ],
     )
-    game.start(notes_p1=(), notes_p2=(_note(player=2, hit_ms=1000),))
-    song.position_ms = 1100
-    snapshot = game.tick()
-
-    assert snapshot.error_count == 1
-    assert snapshot.health == 20
-    assert snapshot.game_over is False
-
-
-def test_solo_mode_ignores_p2_bad_press_health_penalty() -> None:
-    song = ScriptedSongManager()
-    buttons = ScriptedButtons([ButtonPresses(p1=False, p2=True)])
     game = GameManager(
         song_manager=song,  # type: ignore[arg-type]
         button_manager=buttons,  # type: ignore[arg-type]
@@ -210,31 +234,17 @@ def test_solo_mode_ignores_p2_bad_press_health_penalty() -> None:
         gameplay=_gameplay_config(),
         led=_led_config(),
         runtime=RuntimeConfig(update_hz=60),
-        solo_mode=True,
     )
-    game.start(notes_p1=(), notes_p2=(_note(player=2, hit_ms=1000),))
-    song.position_ms = 800
-    snapshot = game.tick()
-
-    assert snapshot.error_count == 1
-    assert snapshot.health == 20
-
-
-def test_solo_mode_still_applies_p2_good_hits() -> None:
-    song = ScriptedSongManager()
-    buttons = ScriptedButtons([ButtonPresses(p1=False, p2=True)])
-    game = GameManager(
-        song_manager=song,  # type: ignore[arg-type]
-        button_manager=buttons,  # type: ignore[arg-type]
-        led_output=SimLedOutput(),
-        gameplay=_gameplay_config(start_health=19),
-        led=_led_config(),
-        runtime=RuntimeConfig(update_hz=60),
-        solo_mode=True,
+    game.start(
+        notes_p1=(_note(player=1, hit_ms=1000), _note(player=1, hit_ms=5000)),
+        notes_p2=(_note(player=2, hit_ms=1000),),
     )
-    game.start(notes_p1=(), notes_p2=(_note(player=2, hit_ms=1000),))
     song.position_ms = 1040
-    snapshot = game.tick()
+    game.tick()  # p1 good (40ms off note 1000)
+    song.position_ms = 1000
+    # Re-target p2: its note is at 1000.
+    game.tick()  # p2 perfect
 
-    assert snapshot.good_count == 1
-    assert snapshot.health == 20
+    p1_pct, p2_pct = game.final_percentages()
+    assert p1_pct == 50   # 1 good of 2 notes -> 100*1/2
+    assert p2_pct == 100  # 1 perfect of 1 note -> capped at 100

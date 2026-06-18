@@ -123,6 +123,11 @@ class GameplayConfig:
     lead_time_beats: int
     judgement_windows_ms: JudgementWindowsMs
     health: HealthConfig
+    duration_s: int
+    score_perfect: int
+    score_good: int
+    score_step_ms: int
+    sfx: SfxConfig
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,6 +144,8 @@ class SfxConfig:
     hit: Path | None
     perfect: Path | None
     miss: Path | None
+    applause: Path | None
+    chime: Path | None
     pitch_randomize: float
 
 
@@ -153,6 +160,12 @@ class PongConfig:
     lives: int
     first_server: int
     auto_perfect_chance: float
+    perfect_distance_leds: int
+    good_distance_leds: int
+    point_flash_count: int
+    point_flash_intensity: float
+    gameover_flash_count: int
+    flash_ms: int
     sfx: SfxConfig
 
 
@@ -249,6 +262,21 @@ def _build_judgement_windows(table: dict[str, object]) -> JudgementWindowsMs:
     return JudgementWindowsMs(perfect=perfect, good=good)
 
 
+def _build_sfx_config(config_dir: Path, table: dict[str, object]) -> SfxConfig:
+    pitch_randomize = _read_float(table, "pitch_randomize", 0.05)
+    if not 0.0 <= pitch_randomize <= 1.0:
+        message = "sfx pitch_randomize must be between 0 and 1"
+        raise ValueError(message)
+    return SfxConfig(
+        hit=_read_optional_path(config_dir, table, "hit"),
+        perfect=_read_optional_path(config_dir, table, "perfect"),
+        miss=_read_optional_path(config_dir, table, "miss"),
+        applause=_read_optional_path(config_dir, table, "applause"),
+        chime=_read_optional_path(config_dir, table, "chime"),
+        pitch_randomize=pitch_randomize,
+    )
+
+
 def _build_health(table: dict[str, object]) -> HealthConfig:
     health_table = _read_toml_table(table, "health")
     return HealthConfig(
@@ -340,6 +368,12 @@ def _build_pong_config(
     lives = _read_int(pong_table, "lives", 3)
     first_server = _read_int(pong_table, "first_server", 1)
     auto_perfect_chance = _read_float(pong_table, "auto_perfect_chance", 0.10)
+    perfect_distance_leds = _read_int(pong_table, "perfect_distance_leds", 1)
+    good_distance_leds = _read_int(pong_table, "good_distance_leds", 4)
+    point_flash_count = _read_int(pong_table, "point_flash_count", 5)
+    point_flash_intensity = _read_float(pong_table, "point_flash_intensity", 0.15)
+    gameover_flash_count = _read_int(pong_table, "gameover_flash_count", 10)
+    flash_ms = _read_int(pong_table, "flash_ms", 150)
 
     if base_travel_ms < 1:
         message = "pong base_travel_ms must be >= 1"
@@ -359,18 +393,23 @@ def _build_pong_config(
     if not 0.0 <= auto_perfect_chance <= 1.0:
         message = "pong auto_perfect_chance must be between 0 and 1"
         raise ValueError(message)
-
-    sfx_table = _read_toml_table(pong_table, "sfx")
-    pitch_randomize = _read_float(sfx_table, "pitch_randomize", 0.05)
-    if not 0.0 <= pitch_randomize <= 1.0:
-        message = "pong.sfx pitch_randomize must be between 0 and 1"
+    if perfect_distance_leds < 0 or good_distance_leds < 0:
+        message = "pong distance windows must be >= 0"
         raise ValueError(message)
-    sfx = SfxConfig(
-        hit=_read_optional_path(config_dir, sfx_table, "hit"),
-        perfect=_read_optional_path(config_dir, sfx_table, "perfect"),
-        miss=_read_optional_path(config_dir, sfx_table, "miss"),
-        pitch_randomize=pitch_randomize,
-    )
+    if good_distance_leds < perfect_distance_leds:
+        message = "pong good_distance_leds must be >= perfect_distance_leds"
+        raise ValueError(message)
+    if point_flash_count < 0 or gameover_flash_count < 0:
+        message = "pong flash counts must be >= 0"
+        raise ValueError(message)
+    if not 0.0 <= point_flash_intensity <= 1.0:
+        message = "pong point_flash_intensity must be between 0 and 1"
+        raise ValueError(message)
+    if flash_ms < 1:
+        message = "pong flash_ms must be >= 1"
+        raise ValueError(message)
+
+    sfx = _build_sfx_config(config_dir, _read_toml_table(pong_table, "sfx"))
 
     return PongConfig(
         base_travel_ms=base_travel_ms,
@@ -380,6 +419,12 @@ def _build_pong_config(
         lives=lives,
         first_server=first_server,
         auto_perfect_chance=auto_perfect_chance,
+        perfect_distance_leds=perfect_distance_leds,
+        good_distance_leds=good_distance_leds,
+        point_flash_count=point_flash_count,
+        point_flash_intensity=point_flash_intensity,
+        gameover_flash_count=gameover_flash_count,
+        flash_ms=flash_ms,
         sfx=sfx,
     )
 
@@ -410,6 +455,11 @@ def _load_app_config_cached(config_path: Path) -> AppConfig:
             lead_time_beats=_read_int(gameplay_table, "lead_time_beats", 4),
             judgement_windows_ms=_build_judgement_windows(gameplay_table),
             health=_build_health(gameplay_table),
+            duration_s=_read_int(gameplay_table, "duration_s", 60),
+            score_perfect=_read_int(gameplay_table, "score_perfect", 3),
+            score_good=_read_int(gameplay_table, "score_good", 1),
+            score_step_ms=_read_int(gameplay_table, "score_step_ms", 200),
+            sfx=_build_sfx_config(config_dir, _read_toml_table(gameplay_table, "sfx")),
         ),
         runtime=RuntimeConfig(
             update_hz=_read_int(runtime_table, "update_hz", 60),

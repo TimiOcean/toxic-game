@@ -5,7 +5,11 @@ from __future__ import annotations
 from toxic_game.config import LedConfig
 from toxic_game.engine.led_frames import CYAN, MAGENTA, OFF, WHITE, scale_pixel
 from toxic_game.engine.led_gameplay import MARKER_INTENSITY, hit_marker_range
-from toxic_game.engine.pong_led import ball_index_for_player, build_pong_frame
+from toxic_game.engine.pong_led import (
+    ball_index_for_player,
+    build_flash_frame,
+    build_pong_frame,
+)
 from toxic_game.engine.scoring import Judgement
 
 
@@ -116,3 +120,17 @@ def test_feedback_hides_marker_and_flashes_color() -> None:
     )
 
     assert frame.pixels[0] == WHITE  # perfect flash anchor at P1 end
+
+
+def test_full_strip_flash_fills_every_pixel() -> None:
+    color = scale_pixel(MAGENTA, 0.15)
+    frame = build_flash_frame(30, color)
+
+    assert len(frame.pixels) == 30
+    assert all(pixel == color for pixel in frame.pixels)
+
+
+def test_full_strip_flash_off_is_dark() -> None:
+    frame = build_flash_frame(30, OFF)
+
+    assert all(pixel == OFF for pixel in frame.pixels)

@@ -29,11 +29,20 @@ def test_recording_player_records_order() -> None:
     assert player.events == ["hit", "miss"]
 
 
+def test_recording_player_records_applause_and_chime() -> None:
+    player = RecordingSfxPlayer()
+    player.play("applause")
+    player.play("chime")
+    assert player.events == ["applause", "chime"]
+
+
 def test_missing_sfx_files_are_ignored(tmp_path: Path) -> None:
     config = SfxConfig(
         hit=tmp_path / "nope-hit.wav",
         perfect=None,
         miss=tmp_path / "nope-miss.wav",
+        applause=tmp_path / "nope-applause.wav",
+        chime=None,
         pitch_randomize=0.05,
     )
     player = build_sfx_player(config)
@@ -41,12 +50,23 @@ def test_missing_sfx_files_are_ignored(tmp_path: Path) -> None:
     player.play("hit")
     player.play("perfect")
     player.play("miss")
+    player.play("applause")
+    player.play("chime")
 
 
 def test_pygame_player_without_mixer_is_silent() -> None:
-    config = SfxConfig(hit=None, perfect=None, miss=None, pitch_randomize=0.0)
+    config = SfxConfig(
+        hit=None,
+        perfect=None,
+        miss=None,
+        applause=None,
+        chime=None,
+        pitch_randomize=0.0,
+    )
     player = PygameSfxPlayer(config)
     player.play("hit")
+    player.play("applause")
+    player.play("chime")
 
 
 def test_random_pitch_factor_is_within_range() -> None:
