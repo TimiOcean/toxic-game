@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from toxic_game.config import GpioConfig, InputType, build_gpio_config
+from toxic_game.engine.presence import HeldStates
 from toxic_game.hw.gpio_input import ButtonSide, debounce_accept, read_button_states
 
 _BUTTON_SIDES: tuple[ButtonSide, ...] = ("left", "right")
@@ -174,6 +175,14 @@ class ButtonManager:
             self._previous_held[side] = connected
 
         return ButtonPresses(p1=p1_pressed, p2=p2_pressed)
+
+    def held_states(self) -> HeldStates:
+        """Return whether each player's contact circuit is currently closed."""
+        states = self._reader.read_states()
+        return HeldStates(
+            p1=bool(states.get("left", False)),
+            p2=bool(states.get("right", False)),
+        )
 
 
 class SimButtonReader:

@@ -127,7 +127,15 @@ class GameplayConfig:
     score_perfect: int
     score_good: int
     score_step_ms: int
+    empty_shutdown_s: int
     sfx: SfxConfig
+
+
+@dataclass(frozen=True, slots=True)
+class ArcadeConfig:
+    """Arcade dispatcher tuning."""
+
+    start_hold_ms: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -179,6 +187,7 @@ class AppConfig:
     gameplay: GameplayConfig
     runtime: RuntimeConfig
     pong: PongConfig
+    arcade: ArcadeConfig
 
 
 def _resolve_config_path(path: str | Path | None) -> Path:
@@ -357,6 +366,14 @@ def _build_led_config(led_table: dict[str, object]) -> LedConfig:
     )
 
 
+def _build_arcade_config(table: dict[str, object]) -> ArcadeConfig:
+    start_hold_ms = _read_int(table, "start_hold_ms", 500)
+    if start_hold_ms < 1:
+        message = "arcade start_hold_ms must be >= 1"
+        raise ValueError(message)
+    return ArcadeConfig(start_hold_ms=start_hold_ms)
+
+
 def _build_pong_config(
     config_dir: Path,
     pong_table: dict[str, object],
@@ -443,6 +460,12 @@ def _load_app_config_cached(config_path: Path) -> AppConfig:
     gameplay_table = _read_toml_table(document, "gameplay")
     runtime_table = _read_toml_table(document, "runtime")
     pong_table = _read_toml_table(document, "pong")
+    arcade_table = _read_toml_table(document, "arcade")
+
+    empty_shutdown_s = _read_int(gameplay_table, "empty_shutdown_s", 5)
+    if empty_shutdown_s < 1:
+        message = "gameplay empty_shutdown_s must be >= 1"
+        raise ValueError(message)
 
     return AppConfig(
         paths=PathConfig(
@@ -459,12 +482,14 @@ def _load_app_config_cached(config_path: Path) -> AppConfig:
             score_perfect=_read_int(gameplay_table, "score_perfect", 3),
             score_good=_read_int(gameplay_table, "score_good", 1),
             score_step_ms=_read_int(gameplay_table, "score_step_ms", 200),
+            empty_shutdown_s=empty_shutdown_s,
             sfx=_build_sfx_config(config_dir, _read_toml_table(gameplay_table, "sfx")),
         ),
         runtime=RuntimeConfig(
             update_hz=_read_int(runtime_table, "update_hz", 60),
         ),
         pong=_build_pong_config(config_dir, pong_table),
+        arcade=_build_arcade_config(arcade_table),
     )
 
 
@@ -506,3 +531,8 @@ def build_runtime_config(path: str | Path | None = None) -> RuntimeConfig:
 def build_pong_config(path: str | Path | None = None) -> PongConfig:
     """Return Pong game-mode configuration."""
     return load_app_config(path).pong
+
+
+def build_arcade_config(path: str | Path | None = None) -> ArcadeConfig:
+    """Return arcade dispatcher configuration."""
+    return load_app_config(path).arcade

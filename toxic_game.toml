@@ -33,6 +33,10 @@ duration_s = 60        # rhythm jump match length before the song stops
 score_perfect = 3      # points awarded for a perfect hit
 score_good = 1         # points awarded for a good hit
 score_step_ms = 200    # delay between LEDs during the end-of-song score reveal
+empty_shutdown_s = 5   # both pads empty this long ends an active game
+
+[arcade]
+start_hold_ms = 500    # continuous pad contact required to launch a game from idle
 
 [gameplay.judgement_windows_ms]
 perfect = 200
@@ -47,7 +51,7 @@ gain_on_perfect = 2
 
 [gameplay.sfx]
 # Optional WAV/OGG paths (relative to this file). Missing files are ignored.
-chime = ""             # plays for each LED lit during the score reveal
+chime = "chime.mp3"    # plays for each LED lit during the score reveal
 
 [runtime]
 update_hz = 60

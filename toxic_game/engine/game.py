@@ -8,6 +8,7 @@ after a fixed duration or when the song finishes.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -15,6 +16,7 @@ from toxic_game.config import GameplayConfig, LedConfig, RuntimeConfig
 from toxic_game.engine.button_manager import ButtonManager, ButtonPresses
 from toxic_game.engine.led_gameplay import HitFeedback, build_gameplay_frame, feedback_duration_ms
 from toxic_game.engine.notes import ResolvedNote
+from toxic_game.engine.presence import EmptyShutdownTracker, HeldStates
 from toxic_game.engine.score_animation import score_percentage
 from toxic_game.engine.scoring import Judgement, evaluate_press, pop_missed_notes
 from toxic_game.engine.song_manager import SongManager
@@ -26,6 +28,9 @@ class ButtonPoller(Protocol):
 
     def poll(self) -> ButtonPresses:
         """Return edge-triggered button presses for this tick."""
+
+    def held_states(self) -> HeldStates:
+        """Return whether each player's contact circuit is currently closed."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +46,7 @@ class GameSnapshot:
     error_count: int
     pending_p1: int
     pending_p2: int
+    abandoned: bool
 
 
 class GameManager:
@@ -56,6 +62,8 @@ class GameManager:
         led: LedConfig,
         runtime: RuntimeConfig,
         solo_mode: bool = False,
+        empty_shutdown_ms: int = 5000,
+        clock_ms: Callable[[], int] | None = None,
     ) -> None:
         self._song_manager = song_manager
         self._button_manager = button_manager or ButtonManager()
@@ -64,6 +72,7 @@ class GameManager:
         self._led = led
         self._runtime = runtime
         self._solo_mode = solo_mode
+        self._clock_ms = clock_ms or (lambda: int(time.monotonic() * 1000))
 
         self._pending_p1: tuple[ResolvedNote, ...] = ()
         self._pending_p2: tuple[ResolvedNote, ...] = ()
@@ -75,6 +84,8 @@ class GameManager:
         self._total_p1 = 0
         self._total_p2 = 0
         self._finished = False
+        self._abandoned = False
+        self._empty_shutdown = EmptyShutdownTracker(threshold_ms=empty_shutdown_ms)
 
     def start(
         self,
@@ -94,6 +105,10 @@ class GameManager:
         self._good = {1: 0, 2: 0}
         self._error_count = 0
         self._finished = False
+        self._abandoned = False
+        self._empty_shutdown = EmptyShutdownTracker(
+            threshold_ms=self._empty_shutdown.threshold_ms,
+        )
         self._song_manager.play(start_ms=start_ms)
 
     def _prune_feedback(self, *, now_ms: int) -> None:
@@ -180,12 +195,19 @@ class GameManager:
             error_count=self._error_count,
             pending_p1=len(self._pending_p1),
             pending_p2=len(self._pending_p2),
+            abandoned=self._abandoned,
         )
 
     def tick(self) -> GameSnapshot:
         """Advance gameplay by one frame."""
         now_ms = self._song_manager.position_ms
         self._prune_feedback(now_ms=now_ms)
+
+        if self._empty_shutdown.update(
+            self._button_manager.held_states(),
+            now_ms=self._clock_ms(),
+        ):
+            self._abandoned = True
 
         self._consume_misses(now_ms=now_ms)
         presses = self._button_manager.poll()
@@ -234,7 +256,7 @@ class GameManager:
         )
         deadline = time.monotonic() + duration if duration > 0 else None
         snapshot = self.tick()
-        while self._song_manager.is_playing:
+        while self._song_manager.is_playing and not snapshot.abandoned:
             if deadline is not None and time.monotonic() >= deadline:
                 break
             time.sleep(tick_s)

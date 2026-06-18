@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from toxic_game.config import (
+    ArcadeConfig,
     GameplayConfig,
     HealthConfig,
     JudgementWindowsMs,
@@ -14,6 +15,7 @@ from toxic_game.config import (
 from toxic_game.engine.arcade import ArcadeDispatcher, build_idle_frame
 from toxic_game.engine.button_manager import ButtonPresses
 from toxic_game.engine.led_frames import OFF
+from toxic_game.engine.presence import HeldStates
 from toxic_game.hw.led_output import SimLedOutput
 
 
@@ -55,6 +57,7 @@ def _gameplay_config() -> GameplayConfig:
         score_perfect=3,
         score_good=1,
         score_step_ms=200,
+        empty_shutdown_s=5,
         sfx=_sfx_config(),
     )
 
@@ -78,25 +81,43 @@ def _pong_config() -> PongConfig:
     )
 
 
-class _ScriptedPoller:
-    def __init__(self, scripted: list[ButtonPresses]) -> None:
-        self._scripted = scripted
-        self._index = 0
+class _FixedHoldPoller:
+    def __init__(self, held: HeldStates) -> None:
+        self._held = held
 
     def poll(self) -> ButtonPresses:
-        if self._index < len(self._scripted):
-            value = self._scripted[self._index]
-            self._index += 1
-            return value
         return ButtonPresses(p1=False, p2=False)
+
+    def held_states(self) -> HeldStates:
+        return self._held
+
+
+class _TimedHoldPoller:
+    def __init__(self, clock: list[int]) -> None:
+        self._clock = clock
+
+    def poll(self) -> ButtonPresses:
+        return ButtonPresses(p1=False, p2=False)
+
+    def held_states(self) -> HeldStates:
+        if self._clock[0] < 200:
+            return HeldStates(p1=True, p2=False)
+        return HeldStates(p1=False, p2=False)
 
 
 def _make_dispatcher(
     *,
-    poller: _ScriptedPoller,
+    poller: _FixedHoldPoller | _TimedHoldPoller,
     led_output: SimLedOutput,
     calls: list[str],
+    clock: list[int] | None = None,
+    start_hold_ms: int = 500,
 ) -> ArcadeDispatcher:
+    clock_box = clock if clock is not None else [0]
+
+    def advance(_seconds: float) -> None:
+        clock_box[0] += 100
+
     return ArcadeDispatcher(
         button_manager=poller,
         led_output=led_output,
@@ -104,28 +125,42 @@ def _make_dispatcher(
         gameplay=_gameplay_config(),
         pong=_pong_config(),
         runtime=RuntimeConfig(update_hz=60),
-        clock_ms=lambda: 0,
-        sleep=lambda _: None,
+        arcade=ArcadeConfig(start_hold_ms=start_hold_ms),
+        clock_ms=lambda: clock_box[0],
+        sleep=advance,
         run_pong=lambda: calls.append("pong"),
         run_rhythm_jump=lambda: calls.append("rhythm"),
     )
 
 
-def test_p1_press_launches_pong() -> None:
+def test_p1_sustained_hold_launches_pong() -> None:
     calls: list[str] = []
-    poller = _ScriptedPoller([ButtonPresses(p1=True, p2=False)])
-    dispatcher = _make_dispatcher(poller=poller, led_output=SimLedOutput(), calls=calls)
+    clock = [0]
+    poller = _FixedHoldPoller(HeldStates(p1=True, p2=False))
+    dispatcher = _make_dispatcher(
+        poller=poller,
+        led_output=SimLedOutput(),
+        calls=calls,
+        clock=clock,
+    )
 
     player = dispatcher.run_once()
 
     assert player == 1
     assert calls == ["pong"]
+    assert clock[0] >= 500
 
 
-def test_p2_press_launches_rhythm_jump() -> None:
+def test_p2_sustained_hold_launches_rhythm_jump() -> None:
     calls: list[str] = []
-    poller = _ScriptedPoller([ButtonPresses(p1=False, p2=True)])
-    dispatcher = _make_dispatcher(poller=poller, led_output=SimLedOutput(), calls=calls)
+    clock = [0]
+    poller = _FixedHoldPoller(HeldStates(p1=False, p2=True))
+    dispatcher = _make_dispatcher(
+        poller=poller,
+        led_output=SimLedOutput(),
+        calls=calls,
+        clock=clock,
+    )
 
     player = dispatcher.run_once()
 
@@ -133,25 +168,55 @@ def test_p2_press_launches_rhythm_jump() -> None:
     assert calls == ["rhythm"]
 
 
+def test_short_hold_does_not_launch() -> None:
+    from toxic_game.engine.presence import HoldStartTracker
+
+    tracker = HoldStartTracker(start_hold_ms=500)
+    assert tracker.update(HeldStates(p1=True, p2=False), now_ms=0) is None
+    assert tracker.update(HeldStates(p1=False, p2=False), now_ms=200) is None
+
+
 def test_run_returns_to_idle_between_launches() -> None:
     calls: list[str] = []
-    poller = _ScriptedPoller(
+    launches = iter(
         [
-            ButtonPresses(p1=True, p2=False),
-            ButtonPresses(p1=False, p2=True),
+            _FixedHoldPoller(HeldStates(p1=True, p2=False)),
+            _FixedHoldPoller(HeldStates(p1=False, p2=True)),
         ],
     )
-    dispatcher = _make_dispatcher(poller=poller, led_output=SimLedOutput(), calls=calls)
+    clock = [0]
 
-    dispatcher.run(max_launches=2)
+    def advance(_seconds: float) -> None:
+        clock[0] += 100
 
+    dispatcher = ArcadeDispatcher(
+        button_manager=next(launches),
+        led_output=SimLedOutput(),
+        led=_led_config(),
+        gameplay=_gameplay_config(),
+        pong=_pong_config(),
+        runtime=RuntimeConfig(update_hz=60),
+        arcade=ArcadeConfig(start_hold_ms=100),
+        clock_ms=lambda: clock[0],
+        sleep=advance,
+        run_pong=lambda: calls.append("pong"),
+        run_rhythm_jump=lambda: calls.append("rhythm"),
+    )
+    clock[0] = 0
+    assert dispatcher.run_once() == 1
+    clock[0] = 0
+    dispatcher._buttons = next(launches)  # noqa: SLF001
+    assert dispatcher.run_once() == 2
     assert calls == ["pong", "rhythm"]
 
 
 def test_idle_renders_breathing_markers() -> None:
     led_output = SimLedOutput()
-    poller = _ScriptedPoller([ButtonPresses(p1=True, p2=False)])
-    dispatcher = _make_dispatcher(poller=poller, led_output=led_output, calls=[])
+    dispatcher = _make_dispatcher(
+        poller=_FixedHoldPoller(HeldStates(p1=False, p2=False)),
+        led_output=led_output,
+        calls=[],
+    )
 
     dispatcher.render_idle()
 
@@ -168,7 +233,6 @@ def test_idle_frame_lights_only_markers() -> None:
     frame = build_idle_frame(strip_len=20, span=2, led=_led_config(), phase_ms=0)
     lit = [index for index, pixel in enumerate(frame.pixels) if pixel != OFF]
 
-    # Two markers of span 2 -> four lit pixels near each end.
     assert len(lit) == 4
     assert min(lit) < 5
     assert max(lit) > 14

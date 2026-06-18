@@ -15,6 +15,7 @@ from toxic_game.config import (
 from toxic_game.engine.button_manager import ButtonPresses
 from toxic_game.engine.game import GameManager
 from toxic_game.engine.notes import ResolvedNote
+from toxic_game.engine.presence import HeldStates
 from toxic_game.hw.led_output import SimLedOutput
 
 
@@ -42,9 +43,15 @@ class ScriptedSongManager:
 class ScriptedButtons:
     """Return predefined press states per tick."""
 
-    def __init__(self, presses: list[ButtonPresses]) -> None:
+    def __init__(
+        self,
+        presses: list[ButtonPresses],
+        *,
+        held: HeldStates | None = None,
+    ) -> None:
         self._presses = presses
         self._index = 0
+        self._held = held or HeldStates(p1=False, p2=False)
 
     def poll(self) -> ButtonPresses:
         if self._index >= len(self._presses):
@@ -52,6 +59,9 @@ class ScriptedButtons:
         value = self._presses[self._index]
         self._index += 1
         return value
+
+    def held_states(self) -> HeldStates:
+        return self._held
 
 
 def _note(*, player: int, hit_ms: int, spawn_ms: int = 0) -> ResolvedNote:
@@ -90,6 +100,7 @@ def _gameplay_config(*, duration_s: int = 60) -> GameplayConfig:
         score_perfect=3,
         score_good=1,
         score_step_ms=200,
+        empty_shutdown_s=5,
         sfx=_sfx_config(),
     )
 
@@ -248,3 +259,32 @@ def test_final_percentages_capped_at_100() -> None:
     p1_pct, p2_pct = game.final_percentages()
     assert p1_pct == 50   # 1 good of 2 notes -> 100*1/2
     assert p2_pct == 100  # 1 perfect of 1 note -> capped at 100
+
+
+def test_abandons_when_both_pads_empty_for_threshold() -> None:
+    song = ScriptedSongManager()
+    clock = [0]
+    buttons = ScriptedButtons(
+        [],
+        held=HeldStates(p1=False, p2=False),
+    )
+    game = GameManager(
+        song_manager=song,  # type: ignore[arg-type]
+        button_manager=buttons,  # type: ignore[arg-type]
+        led_output=SimLedOutput(),
+        gameplay=_gameplay_config(),
+        led=_led_config(),
+        runtime=RuntimeConfig(update_hz=60),
+        empty_shutdown_ms=5000,
+        clock_ms=lambda: clock[0],
+    )
+    game.start(notes_p1=(), notes_p2=())
+    song.is_playing = True
+
+    clock[0] = 0
+    assert game.tick().abandoned is False
+    clock[0] = 4999
+    assert game.tick().abandoned is False
+    clock[0] = 5000
+    snapshot = game.tick()
+    assert snapshot.abandoned is True

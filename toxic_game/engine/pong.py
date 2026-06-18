@@ -17,6 +17,7 @@ from typing import Literal, Protocol
 from toxic_game.config import JudgementWindowsMs, LedConfig, PongConfig, RuntimeConfig
 from toxic_game.engine.button_manager import ButtonManager, ButtonPresses
 from toxic_game.engine.led_frames import CYAN, MAGENTA, OFF, RgbPixel, WHITE, scale_pixel
+from toxic_game.engine.presence import EmptyShutdownTracker, HeldStates
 from toxic_game.engine.pong_led import (
     ball_index_for_player,
     build_flash_frame,
@@ -38,6 +39,9 @@ class ButtonPoller(Protocol):
 
     def poll(self) -> ButtonPresses:
         """Return edge-triggered button presses for this tick."""
+
+    def held_states(self) -> HeldStates:
+        """Return whether each player's contact circuit is currently closed."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +68,7 @@ class PongSnapshot:
     miss_count: int
     rally_count: int
     game_over: bool
+    abandoned: bool
 
 
 def _other(player: PlayerId) -> PlayerId:
@@ -84,6 +89,7 @@ class PongManager:
         runtime: RuntimeConfig,
         sfx: SfxPlayer | None = None,
         auto_players: frozenset[PlayerId] = frozenset(),
+        empty_shutdown_ms: int = 5000,
         clock_ms: Callable[[], int] | None = None,
         rng: Callable[[], float] | None = None,
     ) -> None:
@@ -127,6 +133,8 @@ class PongManager:
         self._good_count = 0
         self._miss_count = 0
         self._rally_count = 0
+        self._abandoned = False
+        self._empty_shutdown = EmptyShutdownTracker(threshold_ms=empty_shutdown_ms)
 
     def start(self) -> None:
         """Reset state and serve the first ball."""
@@ -136,6 +144,10 @@ class PongManager:
         self._good_count = 0
         self._miss_count = 0
         self._rally_count = 0
+        self._abandoned = False
+        self._empty_shutdown = EmptyShutdownTracker(
+            threshold_ms=self._empty_shutdown.threshold_ms,
+        )
         self._speed_level = 1.0
         self._perfect_active = False
         self._serve(self._pong.first_server, now_ms=self._clock_ms())  # type: ignore[arg-type]
@@ -280,6 +292,11 @@ class PongManager:
 
         # Always poll so button edge tracking stays current.
         presses = self._button_manager.poll()
+        if self._empty_shutdown.update(
+            self._button_manager.held_states(),
+            now_ms=now_ms,
+        ):
+            self._abandoned = True
 
         if self._state == "point_flash":
             if now_ms >= self._flash_until_ms:
@@ -352,6 +369,7 @@ class PongManager:
             miss_count=self._miss_count,
             rally_count=self._rally_count,
             game_over=self._state == "game_over",
+            abandoned=self._abandoned,
         )
 
     def run(self, *, max_duration_s: float | None = None) -> PongSnapshot:
@@ -363,7 +381,7 @@ class PongManager:
             else None
         )
         snapshot = self.tick()
-        while not snapshot.game_over:
+        while not snapshot.game_over and not snapshot.abandoned:
             if deadline is not None and time.monotonic() >= deadline:
                 break
             time.sleep(tick_s)

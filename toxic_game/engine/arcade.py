@@ -13,6 +13,7 @@ from collections.abc import Callable
 from typing import Protocol
 
 from toxic_game.config import (
+    ArcadeConfig,
     GameplayConfig,
     LedConfig,
     PongConfig,
@@ -31,6 +32,7 @@ from toxic_game.engine.led_frames import (
 from toxic_game.engine.led_gameplay import MARKER_INTENSITY, hit_marker_range
 from toxic_game.engine.notes import SongNotes
 from toxic_game.engine.pong import PongManager
+from toxic_game.engine.presence import HoldStartTracker, HeldStates
 from toxic_game.engine.score_animation import leds_to_light, run_score_animation
 from toxic_game.engine.song_config import SongConfig
 from toxic_game.engine.song_manager import SongManager
@@ -46,6 +48,9 @@ class ButtonPoller(Protocol):
 
     def poll(self) -> ButtonPresses:
         """Return edge-triggered button presses for this tick."""
+
+    def held_states(self) -> HeldStates:
+        """Return whether each player's contact circuit is currently closed."""
 
 
 def build_idle_frame(
@@ -87,6 +92,7 @@ class ArcadeDispatcher:
         gameplay: GameplayConfig,
         pong: PongConfig,
         runtime: RuntimeConfig,
+        arcade: ArcadeConfig,
         song: SongConfig | None = None,
         notes: SongNotes | None = None,
         song_manager: SongManager | None = None,
@@ -103,6 +109,7 @@ class ArcadeDispatcher:
         self._gameplay = gameplay
         self._pong = pong
         self._runtime = runtime
+        self._arcade = arcade
         self._song = song
         self._notes = notes
         self._song_manager = song_manager
@@ -129,13 +136,15 @@ class ArcadeDispatcher:
 
     def _await_press(self) -> int:
         tick_s = 1.0 / max(self._runtime.update_hz, 1)
+        hold_tracker = HoldStartTracker(start_hold_ms=self._arcade.start_hold_ms)
         while True:
             self.render_idle()
-            presses = self._buttons.poll()
-            if presses.p1:
-                return 1
-            if presses.p2:
-                return 2
+            player = hold_tracker.update(
+                self._buttons.held_states(),
+                now_ms=self._clock_ms(),
+            )
+            if player is not None:
+                return player
             self._sleep(tick_s)
 
     def _default_run_pong(self) -> None:
@@ -147,6 +156,7 @@ class ArcadeDispatcher:
             pong=self._pong,
             runtime=self._runtime,
             sfx=self._pong_sfx,
+            empty_shutdown_ms=self._gameplay.empty_shutdown_s * 1000,
         )
         game.start()
         game.run()
@@ -163,9 +173,12 @@ class ArcadeDispatcher:
             gameplay=self._gameplay,
             led=self._led,
             runtime=self._runtime,
+            empty_shutdown_ms=self._gameplay.empty_shutdown_s * 1000,
         )
         game.start(notes_p1=self._notes.player1, notes_p2=self._notes.player2)
-        game.run()
+        snapshot = game.run()
+        if snapshot.abandoned:
+            return
         p1_pct, p2_pct = game.final_percentages()
         half_len = self._strip_len // 2
         run_score_animation(

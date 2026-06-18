@@ -121,7 +121,17 @@ def test_gameplay_score_defaults(tmp_path: Path) -> None:
     assert config.gameplay.score_perfect == 3
     assert config.gameplay.score_good == 1
     assert config.gameplay.score_step_ms == 200
+    assert config.gameplay.empty_shutdown_s == 5
     assert config.gameplay.sfx.chime is None
+
+
+def test_arcade_defaults(tmp_path: Path) -> None:
+    config_path = tmp_path / "empty.toml"
+    config_path.write_text("", encoding="utf-8")
+
+    config = load_app_config(config_path)
+
+    assert config.arcade.start_hold_ms == 500
 
 
 def test_gameplay_sfx_path_resolved_relative_to_config(tmp_path: Path) -> None:

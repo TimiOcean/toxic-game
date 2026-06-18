@@ -8,6 +8,7 @@ import sys
 from collections.abc import Sequence
 
 from toxic_game.config import (
+    build_arcade_config,
     build_gameplay_config,
     build_led_config,
     build_pong_config,
@@ -31,6 +32,7 @@ def run_arcade(*, song_id: str, sim_led: bool, mute: bool) -> int:
     led = build_led_config()
     pong = build_pong_config()
     runtime = build_runtime_config()
+    arcade = build_arcade_config()
 
     song = load_song_by_id(song_id)
     song_dir = resolve_song_dir(song_id)
@@ -61,6 +63,7 @@ def run_arcade(*, song_id: str, sim_led: bool, mute: bool) -> int:
         gameplay=gameplay,
         pong=pong,
         runtime=runtime,
+        arcade=arcade,
         song=song,
         notes=notes,
         song_manager=song_manager,

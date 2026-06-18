@@ -318,3 +318,18 @@ def test_demo_mode_both_auto_rallies_without_miss() -> None:
     snapshot = manager.tick()
     assert snapshot.rally_count >= 5
     assert snapshot.game_over is False
+    assert snapshot.abandoned is False
+
+
+def test_abandons_when_both_pads_empty_for_threshold() -> None:
+    clock = _ManualClock()
+    reader = SimButtonReader({"left": False, "right": False})
+    manager, _ = _make_manager(clock=clock, reader=reader)
+    manager.start()
+
+    clock.now = 0
+    assert manager.tick().abandoned is False
+    clock.now = 4999
+    assert manager.tick().abandoned is False
+    clock.now = 5000
+    assert manager.tick().abandoned is True
