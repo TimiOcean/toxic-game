@@ -41,7 +41,7 @@ def _led_config() -> LedConfig:
         brightness=255,
         channel=0,
         hit_flash_ms=200,
-        running_light_span=2,
+        running_light_span=4,
         rgbw_byte_order="WRGB",
         hit_marker_fraction=0.10,
         running_light_spawn="end",
@@ -225,7 +225,7 @@ def test_idle_renders_breathing_markers() -> None:
 
     expected = build_idle_frame(
         strip_len=20,
-        span=2,
+        span=4,
         led=_led_config(),
         phase_ms=0,
     )

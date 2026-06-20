@@ -21,12 +21,13 @@ from toxic_game.engine.led_frames import (
 )
 from toxic_game.engine.notes import ResolvedNote
 from toxic_game.engine.scoring import Judgement
-from toxic_game.engine.timing import SongTiming, beat_pulse_brightness
+from toxic_game.engine.timing import SongTiming
 from toxic_game.hw.led_patterns import player1_chase_pixels, player2_chase_pixels
 
 PlayerId = Literal[1, 2]
 
-MARKER_INTENSITY = 0.15
+MARKER_INTENSITY = 0.60
+RUNNING_LIGHT_INTENSITY = 0.60
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,12 +158,6 @@ def _note_travel_pixels(
         span=span,
         fraction=led.hit_marker_fraction,
     )
-    beat_pulse = (
-        beat_pulse_brightness(timing, progress_ms)
-        if timing is not None
-        else 1.0
-    )
-
     if note.player == 1:
         marker_head = marker_end
     else:
@@ -177,17 +172,25 @@ def _note_travel_pixels(
         head_index = round(spawn_head + ratio * (marker_head - spawn_head))
         chase_kwargs = {
             "brightness_ramp": False,
-            "travel_brightness": ratio,
-            "beat_pulse": beat_pulse,
+            "travel_brightness": RUNNING_LIGHT_INTENSITY,
+            "beat_pulse": 1.0,
         }
     elif note.player == 1:
         max_step = max((strip_len - 1) - marker_head, 0)
         head_index = (strip_len - 1) - round(ratio * max_step)
-        chase_kwargs = {"brightness_ramp": True, "beat_pulse": beat_pulse}
+        chase_kwargs = {
+            "brightness_ramp": False,
+            "travel_brightness": RUNNING_LIGHT_INTENSITY,
+            "beat_pulse": 1.0,
+        }
     else:
         max_step = max(marker_head, 0)
         head_index = round(ratio * max_step)
-        chase_kwargs = {"brightness_ramp": True, "beat_pulse": beat_pulse}
+        chase_kwargs = {
+            "brightness_ramp": False,
+            "travel_brightness": RUNNING_LIGHT_INTENSITY,
+            "beat_pulse": 1.0,
+        }
 
     if note.player == 1:
         return player1_chase_pixels(

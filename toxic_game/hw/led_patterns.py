@@ -17,8 +17,6 @@ from toxic_game.engine.led_frames import (
 
 Side = Literal["left", "right"]
 
-RUNNING_LIGHT_EDGE_INTENSITY = 0.10
-
 
 def solid_pixels(count: int, color: RgbPixel) -> tuple[RgbPixel, ...]:
     """Fill the strip with one color."""
@@ -64,14 +62,8 @@ def _place_span(
         brightness = 1.0
     brightness *= min(max(beat_pulse, 0.0), 1.0)
     lit = scale_pixel(color, brightness)
-    dim = scale_pixel(lit, RUNNING_LIGHT_EDGE_INTENSITY)
     for index in range(start, end + 1):
         pixels[index] = lit
-
-    if start - 1 >= 0:
-        pixels[start - 1] = dim
-    if end + 1 < count:
-        pixels[end + 1] = dim
 
 
 def player1_chase_pixels(
