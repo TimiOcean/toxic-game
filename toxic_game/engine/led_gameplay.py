@@ -115,7 +115,7 @@ def _active_feedback_players(
 def _static_marker_pixels(
     *,
     strip_len: int,
-    span: int,
+    marker_span: int,
     led: LedConfig,
     hidden_players: frozenset[PlayerId] = frozenset(),
 ) -> tuple[RgbPixel, ...]:
@@ -126,7 +126,7 @@ def _static_marker_pixels(
         start, end = hit_marker_range(
             player=player,  # type: ignore[arg-type]
             strip_len=strip_len,
-            span=span,
+            span=marker_span,
             fraction=led.hit_marker_fraction,
         )
         lit = scale_pixel(color, MARKER_INTENSITY)
@@ -138,7 +138,9 @@ def _static_marker_pixels(
 def _note_travel_pixels(
     *,
     strip_len: int,
-    span: int,
+    marker_span: int,
+    chase_span: int,
+    tail_length: int,
     note: ResolvedNote,
     progress_ms: int,
     timing: SongTiming | None,
@@ -155,7 +157,7 @@ def _note_travel_pixels(
     marker_start, marker_end = hit_marker_range(
         player=note.player,  # type: ignore[arg-type]
         strip_len=strip_len,
-        span=span,
+        span=marker_span,
         fraction=led.hit_marker_fraction,
     )
     if note.player == 1:
@@ -166,7 +168,7 @@ def _note_travel_pixels(
     if led.running_light_spawn == "center":
         spawn_head = center_spawn_head_index(
             strip_len=strip_len,
-            span=span,
+            span=chase_span,
             player=note.player,  # type: ignore[arg-type]
         )
         head_index = round(spawn_head + ratio * (marker_head - spawn_head))
@@ -196,14 +198,16 @@ def _note_travel_pixels(
         return player1_chase_pixels(
             strip_len,
             head_index,
-            span,
+            chase_span,
+            tail_length=tail_length,
             **chase_kwargs,
         )
 
     return player2_chase_pixels(
         strip_len,
         head_index,
-        span,
+        chase_span,
+        tail_length=tail_length,
         **chase_kwargs,
     )
 
@@ -298,7 +302,6 @@ def feedback_duration_ms(feedback: HitFeedback, led: LedConfig) -> int:
 def build_gameplay_frame(
     *,
     strip_len: int,
-    span: int,
     progress_ms: int,
     notes: tuple[ResolvedNote, ...],
     feedback: tuple[HitFeedback, ...],
@@ -313,7 +316,7 @@ def build_gameplay_frame(
     )
     pixels = list(_static_marker_pixels(
         strip_len=strip_len,
-        span=span,
+        marker_span=led.marker_span,
         led=led,
         hidden_players=hidden_markers,
     ))
@@ -321,7 +324,9 @@ def build_gameplay_frame(
     for note in notes:
         _merge_pixels(pixels, _note_travel_pixels(
             strip_len=strip_len,
-            span=span,
+            marker_span=led.marker_span,
+            chase_span=led.running_light_span,
+            tail_length=led.running_light_tail,
             note=note,
             progress_ms=progress_ms,
             timing=timing,

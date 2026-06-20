@@ -112,7 +112,7 @@ class PongManager:
         self._rng = rng or random.random
 
         self._strip_len = led.active_count
-        self._span = led.running_light_span
+        self._marker_span = led.marker_span
         self._fraction = led.hit_marker_fraction
 
         self._lives: dict[PlayerId, int] = {1: pong.lives, 2: pong.lives}
@@ -165,7 +165,7 @@ class PongManager:
         return ball_index_for_player(
             player,
             strip_len=self._strip_len,
-            span=self._span,
+            span=self._marker_span,
             fraction=self._fraction,
         )
 
@@ -362,7 +362,6 @@ class PongManager:
         ball_visible = self._state != "game_over"
         frame = build_pong_frame(
             strip_len=self._strip_len,
-            span=self._span,
             led=self._led,
             ball_head_index=self._ball_head_index(now_ms),
             ball_color=self._ball_color,

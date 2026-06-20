@@ -93,6 +93,7 @@ def run_led_check(
             count=active,
             span=led_config.running_light_span,
             color=color,
+            tail_length=led_config.running_light_tail,
         )
 
     loops = options.repeat if options.repeat > 0 else 1

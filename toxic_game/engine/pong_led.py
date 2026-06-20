@@ -130,7 +130,6 @@ def build_flash_frame(strip_len: int, color: RgbPixel) -> LedFrame:
 def build_pong_frame(
     *,
     strip_len: int,
-    span: int,
     led: LedConfig,
     ball_head_index: int,
     ball_color: RgbPixel,
@@ -150,7 +149,7 @@ def build_pong_frame(
 
     pixels = _marker_pixels(
         strip_len=strip_len,
-        span=span,
+        span=led.marker_span,
         led=led,
         hidden_players=frozenset(hidden_players),
     )
@@ -162,10 +161,11 @@ def build_pong_frame(
             chase_pixels(
                 strip_len,
                 ball_head_index,
-                span,
+                led.running_light_span,
                 color,
                 travel_right_to_left=travel_right_to_left,
                 brightness_ramp=False,
+                tail_length=led.running_light_tail,
             ),
         )
 

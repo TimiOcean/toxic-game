@@ -223,7 +223,6 @@ class GameManager:
 
         frame = build_gameplay_frame(
             strip_len=self._led.active_count,
-            span=self._led.running_light_span,
             progress_ms=now_ms,
             notes=(*self._pending_p1, *self._pending_p2),
             feedback=tuple(self._feedback),

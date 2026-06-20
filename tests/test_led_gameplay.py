@@ -33,7 +33,9 @@ def _led_config(**overrides: object) -> LedConfig:
         "brightness": 255,
         "channel": 0,
         "hit_flash_ms": 500,
-        "running_light_span": 4,
+        "marker_span": 2,
+        "running_light_span": 1,
+        "running_light_tail": 4,
         "rgbw_byte_order": "WRGB",
         "hit_marker_fraction": 0.10,
         "running_light_spawn": "end",
@@ -45,7 +47,6 @@ def _led_config(**overrides: object) -> LedConfig:
 def _frame(**kwargs: object):
     defaults = {
         "strip_len": 10,
-        "span": 4,
         "progress_ms": 0,
         "notes": (),
         "feedback": (),
@@ -56,7 +57,7 @@ def _frame(**kwargs: object):
 
 
 def test_static_markers_hidden_during_hit_feedback() -> None:
-    p1_start, p1_end = hit_marker_range(player=1, strip_len=10, span=4, fraction=0.10)
+    p1_start, p1_end = hit_marker_range(player=1, strip_len=10, span=2, fraction=0.10)
     frame = _frame(
         progress_ms=1050,
         feedback=(HitFeedback(player=1, started_ms=1000, judgement=Judgement.PERFECT),),
@@ -69,8 +70,8 @@ def test_static_markers_hidden_during_hit_feedback() -> None:
 def test_static_markers_always_visible() -> None:
     frame = _frame()
 
-    p1_start, p1_end = hit_marker_range(player=1, strip_len=10, span=4, fraction=0.10)
-    p2_start, p2_end = hit_marker_range(player=2, strip_len=10, span=4, fraction=0.10)
+    p1_start, p1_end = hit_marker_range(player=1, strip_len=10, span=2, fraction=0.10)
+    p2_start, p2_end = hit_marker_range(player=2, strip_len=10, span=2, fraction=0.10)
     dim_magenta = scale_pixel(MAGENTA, 0.60)
     dim_cyan = scale_pixel(CYAN, 0.60)
 
@@ -84,7 +85,7 @@ def test_running_light_overlays_marker_at_hit() -> None:
     note = _p1_note(hit_ms=1000, spawn_ms=0)
     frame = _frame(progress_ms=1000, notes=(note,))
 
-    marker_start, marker_end = hit_marker_range(player=1, strip_len=10, span=4, fraction=0.10)
+    marker_start, marker_end = hit_marker_range(player=1, strip_len=10, span=2, fraction=0.10)
     for index in range(marker_start, marker_end + 1):
         assert frame.pixels[index] != OFF
         assert sum(frame.pixels[index]) >= sum(scale_pixel(MAGENTA, 0.60))
@@ -93,7 +94,7 @@ def test_running_light_overlays_marker_at_hit() -> None:
 def test_running_light_hidden_after_hit() -> None:
     frame = _frame(progress_ms=1001, notes=(_p1_note(hit_ms=1000, spawn_ms=0),))
 
-    marker_start, marker_end = hit_marker_range(player=1, strip_len=10, span=4, fraction=0.10)
+    marker_start, marker_end = hit_marker_range(player=1, strip_len=10, span=2, fraction=0.10)
     dim_magenta = scale_pixel(MAGENTA, 0.60)
     for index in range(marker_start, marker_end + 1):
         assert frame.pixels[index] == dim_magenta
@@ -101,9 +102,18 @@ def test_running_light_hidden_after_hit() -> None:
 
 def test_running_light_keeps_constant_intensity() -> None:
     note = _p1_note(hit_ms=3000, spawn_ms=0)
-    early = _frame(progress_ms=800, notes=(note,))
-    late = _frame(progress_ms=2000, notes=(note,))
-    assert max(sum(pixel) for pixel in early.pixels) == max(sum(pixel) for pixel in late.pixels)
+    led = _led_config(running_light_tail=0)
+    early = _frame(progress_ms=800, notes=(note,), led=led)
+    late = _frame(progress_ms=2000, notes=(note,), led=led)
+
+    def magenta_chase_peak(frame) -> int:
+        return max(
+            sum(pixel)
+            for pixel in frame.pixels
+            if pixel[0] > 0 and pixel[1] == 0 and pixel[2] > 0
+        )
+
+    assert magenta_chase_peak(early) == magenta_chase_peak(late)
 
 
 def test_p1_travel_starts_on_right_end() -> None:
@@ -123,8 +133,8 @@ def test_p2_travel_starts_on_left_end() -> None:
 
 
 def test_p1_keeps_constant_brightness_toward_hit() -> None:
-    early = _frame(progress_ms=0, span=1, notes=(_p1_note(hit_ms=1000, spawn_ms=0),))
-    late = _frame(progress_ms=900, span=1, notes=(_p1_note(hit_ms=1000, spawn_ms=0),))
+    early = _frame(progress_ms=0, notes=(_p1_note(hit_ms=1000, spawn_ms=0),))
+    late = _frame(progress_ms=900, notes=(_p1_note(hit_ms=1000, spawn_ms=0),))
 
     early_peak = max(sum(pixel) for pixel in early.pixels)
     late_peak = max(sum(pixel) for pixel in late.pixels)
@@ -135,9 +145,9 @@ def test_center_spawn_p1_starts_at_middle_not_right_end() -> None:
     note = _p1_note(hit_ms=1000, spawn_ms=0)
     led = _led_config(running_light_spawn="center")
     strip_len = 20
-    span = 4
-    spawn_head = center_spawn_head_index(strip_len=strip_len, span=span, player=1)
-    frame = _frame(strip_len=strip_len, span=span, notes=(note,), led=led)
+    chase_span = led.running_light_span
+    spawn_head = center_spawn_head_index(strip_len=strip_len, span=chase_span, player=1)
+    frame = _frame(strip_len=strip_len, notes=(note,), led=led)
 
     assert frame.pixels[-1] == OFF
     assert frame.pixels[spawn_head] != OFF
@@ -145,7 +155,6 @@ def test_center_spawn_p1_starts_at_middle_not_right_end() -> None:
     mid_travel = _frame(
         progress_ms=500,
         strip_len=strip_len,
-        span=span,
         notes=(note,),
         led=led,
     )
@@ -163,7 +172,7 @@ def test_center_spawn_p1_reaches_marker_at_hit() -> None:
         led=_led_config(running_light_spawn="center"),
     )
 
-    marker_start, marker_end = hit_marker_range(player=1, strip_len=10, span=4, fraction=0.10)
+    marker_start, marker_end = hit_marker_range(player=1, strip_len=10, span=2, fraction=0.10)
     for index in range(marker_start, marker_end + 1):
         assert frame.pixels[index] != OFF
         assert sum(frame.pixels[index]) >= sum(scale_pixel(MAGENTA, 0.60))
@@ -172,7 +181,7 @@ def test_center_spawn_p1_reaches_marker_at_hit() -> None:
 def test_center_spawn_p2_starts_at_middle_not_left_end() -> None:
     note = _p2_note(hit_ms=1000, spawn_ms=0)
     led = _led_config(running_light_spawn="center")
-    spawn_head = center_spawn_head_index(strip_len=10, span=4, player=2)
+    spawn_head = center_spawn_head_index(strip_len=10, span=1, player=2)
     mid_travel = _frame(progress_ms=500, notes=(note,), led=led)
 
     assert mid_travel.pixels[0] == OFF
@@ -180,8 +189,8 @@ def test_center_spawn_p2_starts_at_middle_not_left_end() -> None:
 
 
 def test_center_spawn_head_index_centers_the_span() -> None:
-    assert center_spawn_head_index(strip_len=10, span=4, player=1) == 6
-    assert center_spawn_head_index(strip_len=10, span=4, player=2) == 3
+    assert center_spawn_head_index(strip_len=10, span=1, player=1) == 4
+    assert center_spawn_head_index(strip_len=10, span=1, player=2) == 4
 
 
 def test_perfect_feedback_is_white_burst() -> None:
@@ -241,7 +250,7 @@ def test_feedback_hidden_after_flash_window() -> None:
         led=_led_config(hit_flash_ms=500),
     )
 
-    p1_start, p1_end = hit_marker_range(player=1, strip_len=10, span=4, fraction=0.10)
+    p1_start, p1_end = hit_marker_range(player=1, strip_len=10, span=2, fraction=0.10)
     dim_magenta = scale_pixel(MAGENTA, 0.60)
     for index in range(p1_start, p1_end + 1):
         assert frame.pixels[index] == dim_magenta
@@ -249,7 +258,7 @@ def test_feedback_hidden_after_flash_window() -> None:
 
 
 def test_p1_travel_uses_magenta() -> None:
-    frame = _frame(progress_ms=500, span=1, notes=(_p1_note(hit_ms=1000, spawn_ms=0),))
+    frame = _frame(progress_ms=500, notes=(_p1_note(hit_ms=1000, spawn_ms=0),))
     lit = next(color for color in frame.pixels if color != OFF and color != scale_pixel(CYAN, 0.60))
 
     assert lit == MAGENTA or lit[0] > 0 and lit[2] > 0

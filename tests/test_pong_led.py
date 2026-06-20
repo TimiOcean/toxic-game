@@ -24,7 +24,9 @@ def _led_config(**overrides: object) -> LedConfig:
         "brightness": 255,
         "channel": 0,
         "hit_flash_ms": 200,
-        "running_light_span": 2,
+        "marker_span": 2,
+        "running_light_span": 1,
+        "running_light_tail": 4,
         "rgbw_byte_order": "WRGB",
         "hit_marker_fraction": 0.10,
         "running_light_spawn": "end",
@@ -37,7 +39,6 @@ def test_markers_drawn_in_player_colors() -> None:
     led = _led_config()
     frame = build_pong_frame(
         strip_len=30,
-        span=2,
         led=led,
         ball_head_index=15,
         ball_color=WHITE,
@@ -56,7 +57,6 @@ def test_ball_rendered_in_its_color() -> None:
     led = _led_config()
     frame = build_pong_frame(
         strip_len=30,
-        span=2,
         led=led,
         ball_head_index=15,
         ball_color=MAGENTA,
@@ -66,7 +66,7 @@ def test_ball_rendered_in_its_color() -> None:
     )
 
     assert frame.pixels[15] == MAGENTA
-    assert frame.pixels[14] == MAGENTA
+    assert frame.pixels[16] != OFF
 
 
 def test_ball_overlaps_marker_at_arrival_index() -> None:
@@ -74,7 +74,6 @@ def test_ball_overlaps_marker_at_arrival_index() -> None:
     p2_index = ball_index_for_player(2, strip_len=30, span=2, fraction=0.10)
     frame = build_pong_frame(
         strip_len=30,
-        span=2,
         led=led,
         ball_head_index=p2_index,
         ball_color=CYAN,
@@ -84,15 +83,14 @@ def test_ball_overlaps_marker_at_arrival_index() -> None:
     )
 
     p2_start, p2_end = hit_marker_range(player=2, strip_len=30, span=2, fraction=0.10)
-    for index in range(p2_start, p2_end + 1):
-        assert frame.pixels[index] == CYAN
+    assert frame.pixels[p2_index] == CYAN
+    assert frame.pixels[p2_end] == scale_pixel(CYAN, MARKER_INTENSITY)
 
 
 def test_parked_ball_is_dimmed() -> None:
     led = _led_config()
     frame = build_pong_frame(
         strip_len=30,
-        span=2,
         led=led,
         ball_head_index=15,
         ball_color=WHITE,
@@ -109,7 +107,6 @@ def test_feedback_hides_marker_and_flashes_color() -> None:
     led = _led_config()
     frame = build_pong_frame(
         strip_len=30,
-        span=2,
         led=led,
         ball_head_index=15,
         ball_color=WHITE,

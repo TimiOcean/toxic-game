@@ -62,7 +62,6 @@ class ButtonPoller(Protocol):
 def build_idle_frame(
     *,
     strip_len: int,
-    span: int,
     led: LedConfig,
     phase_ms: int,
     period_ms: int = IDLE_BREATHE_PERIOD_MS,
@@ -77,7 +76,7 @@ def build_idle_frame(
         start, end = hit_marker_range(
             player=player,  # type: ignore[arg-type]
             strip_len=strip_len,
-            span=span,
+            span=led.marker_span,
             fraction=led.hit_marker_fraction,
         )
         lit = scale_pixel(color, MARKER_INTENSITY * breathe)
@@ -129,7 +128,6 @@ class ArcadeDispatcher:
         self._run_demo_impl = run_demo or self._default_run_demo
 
         self._strip_len = led.active_count
-        self._span = led.running_light_span
         self._demo_idle_ms = arcade.demo_idle_s * 1000
 
     def render_idle(self) -> None:
@@ -137,7 +135,6 @@ class ArcadeDispatcher:
         self._led_output.write_frame(
             build_idle_frame(
                 strip_len=self._strip_len,
-                span=self._span,
                 led=self._led,
                 phase_ms=self._clock_ms(),
             ),

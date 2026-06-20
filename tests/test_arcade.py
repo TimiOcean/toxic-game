@@ -53,7 +53,9 @@ def _led_config() -> LedConfig:
         brightness=255,
         channel=0,
         hit_flash_ms=200,
-        running_light_span=4,
+        marker_span=2,
+        running_light_span=1,
+        running_light_tail=4,
         rgbw_byte_order="WRGB",
         hit_marker_fraction=0.10,
         running_light_spawn="end",
@@ -242,7 +244,6 @@ def test_idle_renders_breathing_markers() -> None:
 
     expected = build_idle_frame(
         strip_len=20,
-        span=4,
         led=_led_config(),
         phase_ms=0,
     )
@@ -250,7 +251,7 @@ def test_idle_renders_breathing_markers() -> None:
 
 
 def test_idle_frame_lights_only_markers() -> None:
-    frame = build_idle_frame(strip_len=20, span=2, led=_led_config(), phase_ms=0)
+    frame = build_idle_frame(strip_len=20, led=_led_config(), phase_ms=0)
     lit = [index for index, pixel in enumerate(frame.pixels) if pixel != OFF]
 
     assert len(lit) == 4

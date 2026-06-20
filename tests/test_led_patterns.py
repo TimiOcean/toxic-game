@@ -23,9 +23,16 @@ def test_walk_pixel_moves_left_to_right() -> None:
 
 
 def test_player1_chase_starts_on_right_end() -> None:
-    pixels = player1_chase_pixels(count=10, head_index=9, span=4)
+    pixels = player1_chase_pixels(
+        count=10,
+        head_index=9,
+        span=1,
+        tail_length=4,
+        brightness_ramp=False,
+        travel_brightness=1.0,
+    )
 
-    assert pixels[-1] == OFF
+    assert pixels[-1] != OFF
     assert pixels[0] == OFF
 
 
@@ -38,7 +45,7 @@ def test_player1_chase_spawn_end_is_dark_until_travel_begins() -> None:
 
 
 def test_player1_chase_ends_on_left_end() -> None:
-    pixels = player1_chase_pixels(count=10, head_index=3, span=4)
+    pixels = player1_chase_pixels(count=10, head_index=0, span=1)
 
     assert pixels[0] != OFF
     assert pixels[-1] == OFF
@@ -65,24 +72,72 @@ def test_player1_chase_keeps_constant_brightness() -> None:
     assert early_lit == late_lit
 
 
-def test_player1_chase_has_no_soft_edge_pixels() -> None:
-    pixels = player1_chase_pixels(count=10, head_index=5, span=2)
-    assert pixels[3] == OFF
+def test_player1_chase_renders_fading_tail_behind_head() -> None:
+    pixels = player1_chase_pixels(
+        count=12,
+        head_index=5,
+        span=1,
+        tail_length=4,
+        brightness_ramp=False,
+        travel_brightness=1.0,
+    )
+
+    assert sum(pixels[5]) > 0
+    tail_sums = [sum(pixels[index]) for index in range(6, 10)]
+    assert all(total > 0 for total in tail_sums)
+    assert tail_sums == sorted(tail_sums, reverse=True)
+    assert pixels[10] == OFF
+
+
+def test_player1_chase_no_tail_when_tail_length_zero() -> None:
+    pixels = player1_chase_pixels(
+        count=10,
+        head_index=5,
+        span=1,
+        tail_length=0,
+        brightness_ramp=False,
+        travel_brightness=1.0,
+    )
+
+    assert pixels[5] != OFF
     assert pixels[6] == OFF
 
 
 def test_player2_chase_starts_on_left_end() -> None:
-    pixels = player2_chase_pixels(count=10, head_index=0, span=4)
+    pixels = player2_chase_pixels(
+        count=10,
+        head_index=0,
+        span=1,
+        tail_length=4,
+        brightness_ramp=False,
+        travel_brightness=1.0,
+    )
 
-    assert pixels[0] == OFF
+    assert pixels[0] != OFF
     assert pixels[-1] == OFF
 
 
 def test_player2_chase_ends_on_right_end() -> None:
-    pixels = player2_chase_pixels(count=10, head_index=6, span=4)
+    pixels = player2_chase_pixels(count=10, head_index=9, span=1)
 
     assert pixels[-1] != OFF
     assert pixels[0] == OFF
+
+
+def test_player2_chase_renders_fading_tail_behind_head() -> None:
+    pixels = player2_chase_pixels(
+        count=12,
+        head_index=5,
+        span=1,
+        tail_length=4,
+        brightness_ramp=False,
+        travel_brightness=1.0,
+    )
+
+    assert sum(pixels[5]) > 0
+    tail_sums = [sum(pixels[index]) for index in range(4, 0, -1)]
+    assert all(total > 0 for total in tail_sums)
+    assert tail_sums == sorted(tail_sums, reverse=True)
 
 
 def test_player2_chase_uses_cyan() -> None:
@@ -93,7 +148,7 @@ def test_player2_chase_uses_cyan() -> None:
 
 
 def test_dual_chase_includes_both_colors() -> None:
-    pixels = dual_chase_pixels(count=12, step=3, span=2)
+    pixels = dual_chase_pixels(count=12, step=3, span=1, tail_length=0)
 
     assert any(channel > 0 for channel in pixels[3])  # cyan on left-ish
     assert any(pixels[count] != OFF for count in range(len(pixels)))

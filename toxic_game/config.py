@@ -63,7 +63,9 @@ class LedConfig:
     brightness: int
     channel: int
     hit_flash_ms: int
+    marker_span: int
     running_light_span: int
+    running_light_tail: int
     rgbw_byte_order: str
     hit_marker_fraction: float
     running_light_spawn: RunningLightSpawn
@@ -350,6 +352,19 @@ def _build_led_config(led_table: dict[str, object]) -> LedConfig:
         message = "rgbw_count must be >= 1"
         raise ValueError(message)
 
+    marker_span = _read_int(led_table, "marker_span", 2)
+    running_light_span = _read_int(led_table, "running_light_span", 1)
+    running_light_tail = _read_int(led_table, "running_light_tail", 4)
+    if marker_span < 0:
+        message = "marker_span must be >= 0"
+        raise ValueError(message)
+    if running_light_span < 0:
+        message = "running_light_span must be >= 0"
+        raise ValueError(message)
+    if running_light_tail < 0:
+        message = "running_light_tail must be >= 0"
+        raise ValueError(message)
+
     running_light_spawn = _read_str(led_table, "running_light_spawn", "end")
     if running_light_spawn not in _VALID_RUNNING_LIGHT_SPAWN:
         message = f"invalid running_light_spawn: {running_light_spawn!r} (expected end or center)"
@@ -365,7 +380,9 @@ def _build_led_config(led_table: dict[str, object]) -> LedConfig:
         brightness=_read_int(led_table, "brightness", 255),
         channel=_read_int(led_table, "channel", 0),
         hit_flash_ms=_read_int(led_table, "hit_flash_ms", 180),
-        running_light_span=_read_int(led_table, "running_light_span", 4),
+        marker_span=marker_span,
+        running_light_span=running_light_span,
+        running_light_tail=running_light_tail,
         rgbw_byte_order=_read_str(led_table, "rgbw_byte_order", "WRGB"),
         hit_marker_fraction=_read_float(led_table, "hit_marker_fraction", 0.10),
         running_light_spawn=running_light_spawn,  # type: ignore[arg-type]
