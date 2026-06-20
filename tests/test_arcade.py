@@ -17,6 +17,18 @@ from toxic_game.engine.button_manager import ButtonPresses
 from toxic_game.engine.led_frames import OFF
 from toxic_game.engine.presence import HeldStates
 from toxic_game.hw.led_output import SimLedOutput
+from toxic_game.hw.sfx import RecordingSfxPlayer
+
+
+def _arcade_config(**overrides: object) -> ArcadeConfig:
+    defaults = {
+        "start_hold_ms": 500,
+        "demo_idle_s": 0,
+        "demo_volume": 0.30,
+        "demo_miss_chance": 0.15,
+    }
+    defaults.update(overrides)
+    return ArcadeConfig(**defaults)  # type: ignore[arg-type]
 
 
 def _sfx_config() -> SfxConfig:
@@ -115,6 +127,9 @@ def _make_dispatcher(
     calls: list[str],
     clock: list[int] | None = None,
     start_hold_ms: int = 500,
+    demo_idle_s: int = 0,
+    run_demo: object | None = None,
+    pong_sfx: RecordingSfxPlayer | None = None,
 ) -> ArcadeDispatcher:
     clock_box = clock if clock is not None else [0]
 
@@ -128,11 +143,13 @@ def _make_dispatcher(
         gameplay=_gameplay_config(),
         pong=_pong_config(),
         runtime=RuntimeConfig(update_hz=60),
-        arcade=ArcadeConfig(start_hold_ms=start_hold_ms),
+        arcade=_arcade_config(start_hold_ms=start_hold_ms, demo_idle_s=demo_idle_s),
+        pong_sfx=pong_sfx,
         clock_ms=lambda: clock_box[0],
         sleep=advance,
         run_pong=lambda: calls.append("pong"),
         run_rhythm_jump=lambda: calls.append("rhythm"),
+        run_demo=run_demo,  # type: ignore[arg-type]
     )
 
 
@@ -199,7 +216,7 @@ def test_run_returns_to_idle_between_launches() -> None:
         gameplay=_gameplay_config(),
         pong=_pong_config(),
         runtime=RuntimeConfig(update_hz=60),
-        arcade=ArcadeConfig(start_hold_ms=100),
+        arcade=_arcade_config(start_hold_ms=100),
         clock_ms=lambda: clock[0],
         sleep=advance,
         run_pong=lambda: calls.append("pong"),
@@ -239,3 +256,112 @@ def test_idle_frame_lights_only_markers() -> None:
     assert len(lit) == 4
     assert min(lit) < 5
     assert max(lit) > 14
+
+
+class _DemoThenHoldPoller:
+    """Idle until demo runs, then hold P1 to exit."""
+
+    def __init__(self, calls: list[str]) -> None:
+        self._calls = calls
+
+    def poll(self) -> ButtonPresses:
+        return ButtonPresses(p1=False, p2=False)
+
+    def held_states(self) -> HeldStates:
+        if "demo" in self._calls:
+            return HeldStates(p1=True, p2=False)
+        return HeldStates(p1=False, p2=False)
+
+
+def test_idle_triggers_demo_after_timeout() -> None:
+    calls: list[str] = []
+    clock = [0]
+    poller = _DemoThenHoldPoller(calls)
+
+    def run_demo() -> int | None:
+        calls.append("demo")
+        return None
+
+    dispatcher = _make_dispatcher(
+        poller=poller,
+        led_output=SimLedOutput(),
+        calls=calls,
+        clock=clock,
+        start_hold_ms=100,
+        demo_idle_s=1,
+        run_demo=run_demo,
+    )
+
+    player = dispatcher.run_once()
+
+    assert "demo" in calls
+    assert player == 1
+    assert calls == ["demo", "pong"]
+
+
+def test_demo_interrupt_launches_matching_game() -> None:
+    calls: list[str] = []
+    clock = [0]
+
+    def run_demo() -> int | None:
+        calls.append("demo")
+        return 2
+
+    dispatcher = _make_dispatcher(
+        poller=_FixedHoldPoller(HeldStates(p1=False, p2=False)),
+        led_output=SimLedOutput(),
+        calls=calls,
+        clock=clock,
+        demo_idle_s=1,
+        run_demo=run_demo,
+    )
+
+    player = dispatcher.run_once()
+
+    assert player == 2
+    assert calls == ["demo", "rhythm"]
+
+
+def test_demo_sets_and_restores_sfx_volume() -> None:
+    class _VolumeSpy(RecordingSfxPlayer):
+        def __init__(self) -> None:
+            super().__init__()
+            self.volumes: list[float] = []
+
+        def set_volume(self, volume: float) -> None:
+            self.volumes.append(volume)
+            super().set_volume(volume)
+
+    class _ImmediateHoldPoller:
+        def poll(self) -> ButtonPresses:
+            return ButtonPresses(p1=False, p2=False)
+
+        def held_states(self) -> HeldStates:
+            return HeldStates(p1=True, p2=False)
+
+    sfx = _VolumeSpy()
+    clock = [500]
+
+    def advance(_seconds: float) -> None:
+        clock[0] += 100
+
+    dispatcher = ArcadeDispatcher(
+        button_manager=_ImmediateHoldPoller(),
+        led_output=SimLedOutput(),
+        led=_led_config(),
+        gameplay=_gameplay_config(),
+        pong=_pong_config(),
+        runtime=RuntimeConfig(update_hz=60),
+        arcade=_arcade_config(start_hold_ms=100, demo_volume=0.30),
+        pong_sfx=sfx,
+        clock_ms=lambda: clock[0],
+        sleep=advance,
+        run_pong=lambda: None,
+        run_rhythm_jump=lambda: None,
+    )
+
+    player = dispatcher._default_run_demo()  # noqa: SLF001
+
+    assert player == 1
+    assert sfx.volumes == [0.30, 1.0]
+    assert sfx.volume == 1.0

@@ -92,6 +92,7 @@ class PongManager:
         runtime: RuntimeConfig,
         sfx: SfxPlayer | None = None,
         auto_players: frozenset[PlayerId] = frozenset(),
+        auto_miss_chance: float = 0.0,
         empty_shutdown_ms: int = 5000,
         clock_ms: Callable[[], int] | None = None,
         sleep: Callable[[float], None] | None = None,
@@ -105,6 +106,7 @@ class PongManager:
         self._runtime = runtime
         self._sfx = sfx or NoOpSfxPlayer()
         self._auto_players = auto_players
+        self._auto_miss_chance = auto_miss_chance
         self._clock_ms = clock_ms or (lambda: int(time.monotonic() * 1000))
         self._sleep = sleep or time.sleep
         self._rng = rng or random.random
@@ -125,6 +127,7 @@ class PongManager:
         self._speed_leds_per_ms = 0.0
         self._ball_color: RgbPixel = WHITE
         self._returned = False
+        self._auto_committed_miss = False
         self._speed_level = 1.0
         self._perfect_active = False
         self._state: PongState = "rally"
@@ -183,6 +186,7 @@ class PongManager:
         self._arrival_ms = now_ms + travel
         self._speed_leds_per_ms = distance / travel if travel > 0 else float(distance)
         self._returned = False
+        self._auto_committed_miss = False
         self._state = "rally"
         if is_serve:
             self._sfx.play("hit")
@@ -306,13 +310,20 @@ class PongManager:
                 self._serve(self._pending_server, now_ms=now_ms)
         elif self._state == "rally":
             if self._to_player in self._auto_players:
-                if not self._returned and self._overshoot(now_ms) >= 0:
-                    judgement = (
-                        Judgement.PERFECT
-                        if self._rng() < self._pong.auto_perfect_chance
-                        else Judgement.GOOD
-                    )
-                    self._return_ball(self._to_player, judgement, now_ms)
+                if (
+                    not self._returned
+                    and not self._auto_committed_miss
+                    and self._overshoot(now_ms) >= 0
+                ):
+                    if self._rng() < self._auto_miss_chance:
+                        self._auto_committed_miss = True
+                    else:
+                        judgement = (
+                            Judgement.PERFECT
+                            if self._rng() < self._pong.auto_perfect_chance
+                            else Judgement.GOOD
+                        )
+                        self._return_ball(self._to_player, judgement, now_ms)
             else:
                 self._handle_human_press(presses, now_ms)
 

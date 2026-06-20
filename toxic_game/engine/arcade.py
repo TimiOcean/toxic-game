@@ -108,6 +108,7 @@ class ArcadeDispatcher:
         sleep: Callable[[float], None] | None = None,
         run_pong: Callable[[], None] | None = None,
         run_rhythm_jump: Callable[[], None] | None = None,
+        run_demo: Callable[[], int | None] | None = None,
     ) -> None:
         self._buttons = button_manager
         self._led_output = led_output
@@ -125,9 +126,11 @@ class ArcadeDispatcher:
         self._sleep = sleep or time.sleep
         self._run_pong_impl = run_pong or self._default_run_pong
         self._run_rhythm_jump_impl = run_rhythm_jump or self._default_run_rhythm_jump
+        self._run_demo_impl = run_demo or self._default_run_demo
 
         self._strip_len = led.active_count
         self._span = led.running_light_span
+        self._demo_idle_ms = arcade.demo_idle_s * 1000
 
     def render_idle(self) -> None:
         """Render one idle frame at the current clock phase."""
@@ -143,14 +146,27 @@ class ArcadeDispatcher:
     def _await_press(self) -> int:
         tick_s = 1.0 / max(self._runtime.update_hz, 1)
         hold_tracker = HoldStartTracker(start_hold_ms=self._arcade.start_hold_ms)
+        idle_since_ms = self._clock_ms()
         while True:
             self.render_idle()
+            now_ms = self._clock_ms()
             player = hold_tracker.update(
                 self._buttons.held_states(),
-                now_ms=self._clock_ms(),
+                now_ms=now_ms,
             )
             if player is not None:
                 return player
+            if (
+                self._demo_idle_ms > 0
+                and now_ms - idle_since_ms >= self._demo_idle_ms
+            ):
+                player = self._run_demo_impl()
+                if player is not None:
+                    return player
+                hold_tracker = HoldStartTracker(
+                    start_hold_ms=self._arcade.start_hold_ms,
+                )
+                idle_since_ms = self._clock_ms()
             self._sleep(tick_s)
 
     def _default_run_pong(self) -> None:
@@ -166,6 +182,44 @@ class ArcadeDispatcher:
         )
         game.start()
         game.run()
+
+    def _default_run_demo(self) -> int | None:
+        """Run attract-mode Pong until interrupted or game over."""
+        tick_s = 1.0 / max(self._runtime.update_hz, 1)
+        self._pong_sfx.set_volume(self._arcade.demo_volume)
+        try:
+            game = PongManager(
+                button_manager=self._buttons,
+                led_output=self._led_output,
+                led=self._led,
+                windows=self._gameplay.judgement_windows_ms,
+                pong=self._pong,
+                runtime=self._runtime,
+                sfx=self._pong_sfx,
+                auto_players=frozenset({1, 2}),
+                auto_miss_chance=self._arcade.demo_miss_chance,
+                empty_shutdown_ms=self._gameplay.empty_shutdown_s * 1000,
+                clock_ms=self._clock_ms,
+                sleep=self._sleep,
+            )
+            game.start()
+            hold_tracker = HoldStartTracker(
+                start_hold_ms=self._arcade.start_hold_ms,
+            )
+            while True:
+                snapshot = game.tick()
+                now_ms = self._clock_ms()
+                player = hold_tracker.update(
+                    self._buttons.held_states(),
+                    now_ms=now_ms,
+                )
+                if player is not None:
+                    return player
+                if snapshot.game_over:
+                    return None
+                self._sleep(tick_s)
+        finally:
+            self._pong_sfx.set_volume(1.0)
 
     def _default_run_rhythm_jump(self) -> None:
         if self._song is None or self._notes is None or self._song_manager is None:

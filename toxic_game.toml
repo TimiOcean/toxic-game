@@ -39,6 +39,9 @@ empty_shutdown_s = 5   # both pads empty this long ends an active game
 
 [arcade]
 start_hold_ms = 500    # continuous pad contact required to launch a game from idle
+demo_idle_s = 600      # idle seconds before attract-mode demo Pong starts (0 = disabled)
+demo_volume = 0.30     # SFX volume during attract-mode demo (0..1)
+demo_miss_chance = 0.15  # NPC chance to miss a return during attract-mode demo
 
 [gameplay.judgement_windows_ms]
 perfect = 200

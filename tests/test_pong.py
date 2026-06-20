@@ -100,6 +100,7 @@ def _make_manager(
     reader: SimButtonReader,
     sfx: RecordingSfxPlayer | None = None,
     auto_players: frozenset[int] = frozenset(),
+    auto_miss_chance: float = 0.0,
     rng: object | None = None,
     pong: PongConfig | None = None,
 ) -> tuple[PongManager, SimLedOutput]:
@@ -119,6 +120,7 @@ def _make_manager(
         runtime=RuntimeConfig(update_hz=60),
         sfx=sfx,
         auto_players=auto_players,  # type: ignore[arg-type]
+        auto_miss_chance=auto_miss_chance,
         clock_ms=lambda: clock.now,
         rng=rng,  # type: ignore[arg-type]
     )
@@ -327,6 +329,7 @@ def test_demo_mode_both_auto_rallies_without_miss() -> None:
         clock=clock,
         reader=reader,
         auto_players=frozenset({1, 2}),
+        auto_miss_chance=0.0,
         rng=lambda: 1.0,
     )
     manager.start()
@@ -342,6 +345,28 @@ def test_demo_mode_both_auto_rallies_without_miss() -> None:
     assert snapshot.rally_count >= 5
     assert snapshot.game_over is False
     assert snapshot.abandoned is False
+
+
+def test_auto_player_misses_when_miss_chance_is_one() -> None:
+    clock = _ManualClock()
+    reader = SimButtonReader({"left": False, "right": False})
+    manager, _ = _make_manager(
+        clock=clock,
+        reader=reader,
+        auto_players=frozenset({2}),
+        auto_miss_chance=1.0,
+        rng=lambda: 0.0,
+    )
+    manager.start()
+
+    clock.now = manager._arrival_ms  # noqa: SLF001
+    manager.tick()
+    while manager._state == "rally" and manager._lives[2] == 3:  # noqa: SLF001
+        clock.now += 50
+        snapshot = manager.tick()
+
+    assert snapshot.lives_p2 == 2
+    assert snapshot.miss_count == 1
 
 
 def test_abandons_when_both_pads_empty_for_threshold() -> None:

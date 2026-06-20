@@ -25,6 +25,9 @@ class SfxPlayer(Protocol):
     def play(self, event: SfxEvent) -> None:
         """Play the sample for ``event`` if one is available."""
 
+    def set_volume(self, volume: float) -> None:
+        """Set playback volume in ``[0.0, 1.0]``."""
+
 
 class NoOpSfxPlayer:
     """Sound-effect player that ignores every request."""
@@ -33,6 +36,10 @@ class NoOpSfxPlayer:
         """Drop the request without playing anything."""
         _ = event
 
+    def set_volume(self, volume: float) -> None:
+        """Ignore volume changes."""
+        _ = volume
+
 
 class RecordingSfxPlayer:
     """In-memory sound-effect player that records requested events (tests)."""
@@ -40,10 +47,15 @@ class RecordingSfxPlayer:
     def __init__(self) -> None:
         """Track the ordered list of played events."""
         self.events: list[SfxEvent] = []
+        self.volume = 1.0
 
     def play(self, event: SfxEvent) -> None:
         """Record the event instead of playing audio."""
         self.events.append(event)
+
+    def set_volume(self, volume: float) -> None:
+        """Store the requested volume for test assertions."""
+        self.volume = max(0.0, min(1.0, volume))
 
 
 def random_pitch_factor(
@@ -130,6 +142,7 @@ class PygameSfxPlayer:
         """Load whatever sample files exist; missing ones stay silent."""
         self._pitch_randomize = config.pitch_randomize
         self._rng = rng or random.random
+        self._volume = 1.0
         self._sounds: dict[SfxEvent, object] = {}
         self._pygame = None
         self._sndarray = None
@@ -163,15 +176,22 @@ class PygameSfxPlayer:
         self._sndarray = getattr(pygame, "sndarray", None)
         return getattr(mixer, "Sound", None)
 
+    def set_volume(self, volume: float) -> None:
+        """Set playback volume in ``[0.0, 1.0]``."""
+        self._volume = max(0.0, min(1.0, volume))
+
     def _play_with_pitch(self, sound: object, pitch: float) -> None:
         if abs(pitch - 1.0) < 1e-6 or self._sndarray is None:
+            sound.set_volume(self._volume)  # type: ignore[attr-defined]
             sound.play()  # type: ignore[attr-defined]
             return
         try:
             shifted = resample_pitch(self._sndarray.array(sound), pitch)
             pitched = self._sndarray.make_sound(shifted)
+            pitched.set_volume(self._volume)  # type: ignore[attr-defined]
             pitched.play()
         except Exception:  # noqa: BLE001
+            sound.set_volume(self._volume)  # type: ignore[attr-defined]
             sound.play()  # type: ignore[attr-defined]
 
     def play(self, event: SfxEvent) -> None:

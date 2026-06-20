@@ -29,6 +29,17 @@ def test_recording_player_records_order() -> None:
     assert player.events == ["hit", "miss"]
 
 
+def test_recording_player_set_volume() -> None:
+    player = RecordingSfxPlayer()
+    assert player.volume == 1.0
+    player.set_volume(0.30)
+    assert player.volume == 0.30
+    player.set_volume(1.5)
+    assert player.volume == 1.0
+    player.set_volume(-0.5)
+    assert player.volume == 0.0
+
+
 def test_recording_player_records_applause_and_chime() -> None:
     player = RecordingSfxPlayer()
     player.play("applause")

@@ -135,6 +135,37 @@ def test_arcade_defaults(tmp_path: Path) -> None:
     config = load_app_config(config_path)
 
     assert config.arcade.start_hold_ms == 500
+    assert config.arcade.demo_idle_s == 600
+    assert config.arcade.demo_volume == 0.30
+    assert config.arcade.demo_miss_chance == 0.15
+
+
+def test_invalid_arcade_demo_volume_rejected(tmp_path: Path) -> None:
+    config_path = tmp_path / "bad.toml"
+    config_path.write_text(
+        """
+[arcade]
+demo_volume = 1.5
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="demo_volume"):
+        load_app_config(config_path)
+
+
+def test_invalid_arcade_demo_miss_chance_rejected(tmp_path: Path) -> None:
+    config_path = tmp_path / "bad.toml"
+    config_path.write_text(
+        """
+[arcade]
+demo_miss_chance = -0.1
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="demo_miss_chance"):
+        load_app_config(config_path)
 
 
 def test_gameplay_sfx_path_resolved_relative_to_config(tmp_path: Path) -> None:

@@ -138,6 +138,9 @@ class ArcadeConfig:
     """Arcade dispatcher tuning."""
 
     start_hold_ms: int
+    demo_idle_s: int
+    demo_volume: float
+    demo_miss_chance: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -371,10 +374,27 @@ def _build_led_config(led_table: dict[str, object]) -> LedConfig:
 
 def _build_arcade_config(table: dict[str, object]) -> ArcadeConfig:
     start_hold_ms = _read_int(table, "start_hold_ms", 500)
+    demo_idle_s = _read_int(table, "demo_idle_s", 600)
+    demo_volume = _read_float(table, "demo_volume", 0.30)
+    demo_miss_chance = _read_float(table, "demo_miss_chance", 0.15)
     if start_hold_ms < 1:
         message = "arcade start_hold_ms must be >= 1"
         raise ValueError(message)
-    return ArcadeConfig(start_hold_ms=start_hold_ms)
+    if demo_idle_s < 0:
+        message = "arcade demo_idle_s must be >= 0"
+        raise ValueError(message)
+    if not 0.0 <= demo_volume <= 1.0:
+        message = "arcade demo_volume must be between 0 and 1"
+        raise ValueError(message)
+    if not 0.0 <= demo_miss_chance <= 1.0:
+        message = "arcade demo_miss_chance must be between 0 and 1"
+        raise ValueError(message)
+    return ArcadeConfig(
+        start_hold_ms=start_hold_ms,
+        demo_idle_s=demo_idle_s,
+        demo_volume=demo_volume,
+        demo_miss_chance=demo_miss_chance,
+    )
 
 
 def _build_pong_config(
