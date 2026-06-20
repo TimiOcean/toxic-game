@@ -1,0 +1,26 @@
+[Unit]
+Description=Toxic Game arcade dispatcher (always-on)
+# Start after the network/sound stack is up; the LED strip + audio are local,
+# so we don't hard-require the network.
+After=multi-user.target sound.target tg-ensure-wifi.service
+Wants=sound.target
+
+[Service]
+Type=simple
+# Root is required for the WS2811 LED strip (rpi_ws281x DMA access).
+User=root
+WorkingDirectory=/home/pi/toxic-game
+ExecStart=/home/pi/toxic-game/.venv/bin/tg-arcade --song toxic
+
+# Always bring the arcade back if it exits or crashes.
+Restart=always
+RestartSec=3
+# Never stop trying, even after repeated rapid failures.
+StartLimitIntervalSec=0
+
+# Send wrapper stdout/stderr to the journal (journalctl -u tg-arcade).
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
