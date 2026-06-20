@@ -246,7 +246,9 @@ def test_game_over_plays_applause() -> None:
     clock = _ManualClock()
     reader = SimButtonReader({"left": False, "right": False})
     sfx = RecordingSfxPlayer()
+    delays: list[float] = []
     manager, _ = _make_manager(clock=clock, reader=reader, sfx=sfx)
+    manager._sleep = delays.append  # noqa: SLF001
     manager.start()
 
     manager.tick()
@@ -256,7 +258,27 @@ def test_game_over_plays_applause() -> None:
         if snapshot.game_over:
             break
 
+    manager._run_end_sequence()  # noqa: SLF001
     assert "applause" in sfx.events
+    assert "chime" in sfx.events
+
+
+def test_point_flash_only_lights_scorer_half() -> None:
+    clock = _ManualClock()
+    reader = SimButtonReader({"left": False, "right": False})
+    manager, led = _make_manager(clock=clock, reader=reader)
+    manager.start()
+
+    clock.now = 1200
+    manager.tick()
+    assert manager._state == "point_flash"  # noqa: SLF001
+
+    frame = led.frames[-1]
+    half = len(frame) // 2
+    left_lit = sum(1 for pixel in frame[:half] if pixel != (0, 0, 0))
+    right_lit = sum(1 for pixel in frame[half:] if pixel != (0, 0, 0))
+    assert left_lit > 0
+    assert right_lit == 0
 
 
 def test_solo_auto_player_always_returns() -> None:

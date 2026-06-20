@@ -33,6 +33,8 @@ duration_s = 60        # rhythm jump match length before the song stops
 score_perfect = 3      # points awarded for a perfect hit
 score_good = 1         # points awarded for a good hit
 score_step_ms = 200    # delay between LEDs during the end-of-song score reveal
+applause_flash_count = 10  # winner-color flashes after the score reveal
+applause_flash_ms = 150    # duration of each on/off phase during applause
 empty_shutdown_s = 5   # both pads empty this long ends an active game
 
 [arcade]
@@ -66,7 +68,7 @@ first_server = 1             # player who serves first (1 or 2)
 auto_perfect_chance = 0.10   # solo/demo auto player's chance of a perfect return
 perfect_distance_leds = 1    # LED distance ball<->marker for a perfect hit
 good_distance_leds = 4       # LED distance ball<->marker for a good hit
-point_flash_count = 5        # full-strip flashes in winner color after each point
+point_flash_count = 5        # half-strip flashes in winner color after each point
 point_flash_intensity = 0.15 # brightness of the point flash (0..1)
 gameover_flash_count = 10    # full-strip flashes in match-winner color at game over
 flash_ms = 150               # duration of each on/off phase of a flash

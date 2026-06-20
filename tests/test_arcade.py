@@ -57,6 +57,8 @@ def _gameplay_config() -> GameplayConfig:
         score_perfect=3,
         score_good=1,
         score_step_ms=200,
+        applause_flash_count=10,
+        applause_flash_ms=150,
         empty_shutdown_s=5,
         sfx=_sfx_config(),
     )

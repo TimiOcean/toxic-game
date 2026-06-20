@@ -127,6 +127,8 @@ class GameplayConfig:
     score_perfect: int
     score_good: int
     score_step_ms: int
+    applause_flash_count: int
+    applause_flash_ms: int
     empty_shutdown_s: int
     sfx: SfxConfig
 
@@ -482,6 +484,8 @@ def _load_app_config_cached(config_path: Path) -> AppConfig:
             score_perfect=_read_int(gameplay_table, "score_perfect", 3),
             score_good=_read_int(gameplay_table, "score_good", 1),
             score_step_ms=_read_int(gameplay_table, "score_step_ms", 200),
+            applause_flash_count=_read_int(gameplay_table, "applause_flash_count", 10),
+            applause_flash_ms=_read_int(gameplay_table, "applause_flash_ms", 150),
             empty_shutdown_s=empty_shutdown_s,
             sfx=_build_sfx_config(config_dir, _read_toml_table(gameplay_table, "sfx")),
         ),

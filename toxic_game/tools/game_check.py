@@ -12,8 +12,15 @@ from pathlib import Path
 from toxic_game.config import build_gameplay_config, build_led_config, build_runtime_config
 from toxic_game.engine.button_manager import ButtonManager
 from toxic_game.engine.game import GameManager
+from toxic_game.engine.led_frames import CYAN, MAGENTA
 from toxic_game.engine.notes import load_song_notes
-from toxic_game.engine.score_animation import leds_to_light, run_score_animation
+from toxic_game.engine.score_animation import (
+    build_full_flash_frame,
+    build_tie_applause_frame,
+    leds_to_light,
+    run_applause_animation,
+    run_score_animation,
+)
 from toxic_game.engine.song_config import load_song_by_id, resolve_song_dir
 from toxic_game.engine.song_manager import SongManager
 from toxic_game.hw.audio_playback import PygameAudioPlayer
@@ -123,6 +130,25 @@ def run_game_check(
         p1_target=leds_to_light(p1_pct, half_len),
         p2_target=leds_to_light(p2_pct, half_len),
         step_ms=gameplay_config.score_step_ms,
+    )
+    if p1_pct > p2_pct:
+        applause_frame = build_full_flash_frame(
+            strip_len=led_config.active_count,
+            color=MAGENTA,
+        )
+    elif p2_pct > p1_pct:
+        applause_frame = build_full_flash_frame(
+            strip_len=led_config.active_count,
+            color=CYAN,
+        )
+    else:
+        applause_frame = build_tie_applause_frame(strip_len=led_config.active_count)
+    run_applause_animation(
+        led_output=led_output,
+        sfx=sfx,
+        on_frame=applause_frame,
+        count=gameplay_config.applause_flash_count,
+        flash_ms=gameplay_config.applause_flash_ms,
     )
     song_manager.close()
     return 0

@@ -213,6 +213,26 @@ def test_perfect_feedback_is_white_burst() -> None:
     assert frame.pixels[0] == WHITE
 
 
+def test_error_feedback_starts_at_full_size() -> None:
+    frame_start = _frame(
+        strip_len=20,
+        progress_ms=1000,
+        feedback=(HitFeedback(player=2, started_ms=1000, judgement=Judgement.ERROR),),
+        led=_led_config(hit_flash_ms=500),
+    )
+    frame_mid = _frame(
+        strip_len=20,
+        progress_ms=1250,
+        feedback=(HitFeedback(player=2, started_ms=1000, judgement=Judgement.ERROR),),
+        led=_led_config(hit_flash_ms=500),
+    )
+
+    lit_start = sum(1 for pixel in frame_start.pixels if pixel != OFF)
+    lit_mid = sum(1 for pixel in frame_mid.pixels if pixel != OFF)
+    assert lit_start >= lit_mid
+    assert frame_start.pixels[-1] == RED
+
+
 def test_error_feedback_is_red_burst() -> None:
     frame = _frame(
         strip_len=20,

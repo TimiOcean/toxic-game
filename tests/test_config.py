@@ -21,24 +21,24 @@ def test_load_default_config() -> None:
     assert config.gpio.right_contact_pin == 27
     assert config.gpio.debounce_ms == 30
     assert config.gpio.p1_input == "jumppad"
-    assert config.gpio.p2_input == "button"
+    assert config.gpio.p2_input == "jumppad"
     assert config.gpio.jumppad.min_air_ms == 200
     assert config.gpio.jumppad.retrigger_ms == 400
-    assert config.led.muted_rgb_count == 60
-    assert config.led.rgbw_count == 30
+    assert config.led.muted_rgb_count == 4
+    assert config.led.rgbw_count == 70
     assert config.led.pin == 10
     assert config.led.data_interface == "spi"
-    assert config.led.muted_rgbw_count == 45
-    assert config.led.driver_count == 75
-    assert config.led.total_count == 90
-    assert config.led.active_count == 30
+    assert config.led.muted_rgbw_count == 3
+    assert config.led.driver_count == 73
+    assert config.led.total_count == 74
+    assert config.led.active_count == 70
     assert config.led.rgbw_byte_order == "WRGB"
     assert config.led.hit_flash_ms == 500
     assert config.led.running_light_span == 2
     assert config.led.hit_marker_fraction == 0.10
     assert config.gameplay.lead_time_beats == 8
-    assert config.gameplay.judgement_windows_ms.perfect == 100
-    assert config.gameplay.judgement_windows_ms.good == 300
+    assert config.gameplay.judgement_windows_ms.perfect == 200
+    assert config.gameplay.judgement_windows_ms.good == 500
     assert config.gameplay.health.start == 20
     assert config.gameplay.health.max == 20
     assert config.gameplay.health.lose_on_error == 2
@@ -121,6 +121,8 @@ def test_gameplay_score_defaults(tmp_path: Path) -> None:
     assert config.gameplay.score_perfect == 3
     assert config.gameplay.score_good == 1
     assert config.gameplay.score_step_ms == 200
+    assert config.gameplay.applause_flash_count == 10
+    assert config.gameplay.applause_flash_ms == 150
     assert config.gameplay.empty_shutdown_s == 5
     assert config.gameplay.sfx.chime is None
 

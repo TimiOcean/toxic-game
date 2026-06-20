@@ -252,8 +252,11 @@ def _feedback_flash_pixels(
     start_size = max(1, min(strip_len, style.start_size))
 
     t = age_ms / max(led.hit_flash_ms, 1)
-    peak = _triangular_peak_factor(t=t)
-    size = start_size + round((max_size - start_size) * peak)
+    if feedback.judgement == Judgement.ERROR:
+        envelope = 1.0 - t
+    else:
+        envelope = _triangular_peak_factor(t=t)
+    size = start_size + round((max_size - start_size) * envelope)
     size = max(1, min(strip_len, size))
 
     pixels = blank_pixels(strip_len)

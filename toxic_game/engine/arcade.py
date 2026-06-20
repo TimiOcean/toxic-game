@@ -33,7 +33,13 @@ from toxic_game.engine.led_gameplay import MARKER_INTENSITY, hit_marker_range
 from toxic_game.engine.notes import SongNotes
 from toxic_game.engine.pong import PongManager
 from toxic_game.engine.presence import HoldStartTracker, HeldStates
-from toxic_game.engine.score_animation import leds_to_light, run_score_animation
+from toxic_game.engine.score_animation import (
+    build_full_flash_frame,
+    build_tie_applause_frame,
+    leds_to_light,
+    run_applause_animation,
+    run_score_animation,
+)
 from toxic_game.engine.song_config import SongConfig
 from toxic_game.engine.song_manager import SongManager
 from toxic_game.hw.led_output import LedOutput
@@ -157,6 +163,7 @@ class ArcadeDispatcher:
             runtime=self._runtime,
             sfx=self._pong_sfx,
             empty_shutdown_ms=self._gameplay.empty_shutdown_s * 1000,
+            score_step_ms=self._gameplay.score_step_ms,
         )
         game.start()
         game.run()
@@ -188,6 +195,26 @@ class ArcadeDispatcher:
             p1_target=leds_to_light(p1_pct, half_len),
             p2_target=leds_to_light(p2_pct, half_len),
             step_ms=self._gameplay.score_step_ms,
+            sleep=self._sleep,
+        )
+        if p1_pct > p2_pct:
+            applause_frame = build_full_flash_frame(
+                strip_len=self._strip_len,
+                color=MAGENTA,
+            )
+        elif p2_pct > p1_pct:
+            applause_frame = build_full_flash_frame(
+                strip_len=self._strip_len,
+                color=CYAN,
+            )
+        else:
+            applause_frame = build_tie_applause_frame(strip_len=self._strip_len)
+        run_applause_animation(
+            led_output=self._led_output,
+            sfx=self._gameplay_sfx,
+            on_frame=applause_frame,
+            count=self._gameplay.applause_flash_count,
+            flash_ms=self._gameplay.applause_flash_ms,
             sleep=self._sleep,
         )
 

@@ -20,8 +20,13 @@ from toxic_game.engine.led_frames import CYAN, MAGENTA, OFF, RgbPixel, WHITE, sc
 from toxic_game.engine.presence import EmptyShutdownTracker, HeldStates
 from toxic_game.engine.pong_led import (
     ball_index_for_player,
-    build_flash_frame,
     build_pong_frame,
+)
+from toxic_game.engine.score_animation import (
+    build_full_flash_frame,
+    build_half_flash_frame,
+    run_applause_animation,
+    run_score_animation,
 )
 from toxic_game.engine.scoring import Judgement
 from toxic_game.hw.led_output import LedOutput
@@ -29,7 +34,7 @@ from toxic_game.hw.sfx import NoOpSfxPlayer, SfxPlayer
 
 PlayerId = Literal[1, 2]
 
-PongState = Literal["rally", "point_flash", "gameover_flash", "game_over"]
+PongState = Literal["rally", "point_flash", "game_over"]
 
 _PLAYER_COLORS: dict[PlayerId, RgbPixel] = {1: MAGENTA, 2: CYAN}
 
@@ -90,7 +95,9 @@ class PongManager:
         sfx: SfxPlayer | None = None,
         auto_players: frozenset[PlayerId] = frozenset(),
         empty_shutdown_ms: int = 5000,
+        score_step_ms: int = 200,
         clock_ms: Callable[[], int] | None = None,
+        sleep: Callable[[float], None] | None = None,
         rng: Callable[[], float] | None = None,
     ) -> None:
         self._button_manager = button_manager or ButtonManager()
@@ -101,7 +108,9 @@ class PongManager:
         self._runtime = runtime
         self._sfx = sfx or NoOpSfxPlayer()
         self._auto_players = auto_players
+        self._score_step_ms = score_step_ms
         self._clock_ms = clock_ms or (lambda: int(time.monotonic() * 1000))
+        self._sleep = sleep or time.sleep
         self._rng = rng or random.random
 
         self._strip_len = led.active_count
@@ -125,6 +134,7 @@ class PongManager:
         self._state: PongState = "rally"
         self._pending_server: PlayerId = pong.first_server  # type: ignore[assignment]
         self._flash_color: RgbPixel = WHITE
+        self._flash_side: PlayerId = 1
         self._flash_started_ms = 0
         self._flash_until_ms = 0
         self._feedback: list[_Feedback] = []
@@ -225,10 +235,12 @@ class PongManager:
         self,
         *,
         color: RgbPixel,
+        side: PlayerId,
         count: int,
         now_ms: int,
     ) -> None:
         self._flash_color = color
+        self._flash_side = side
         self._flash_started_ms = now_ms
         self._flash_until_ms = now_ms + count * 2 * self._pong.flash_ms
 
@@ -240,17 +252,12 @@ class PongManager:
         winner = _other(receiver)
         winner_color = _PLAYER_COLORS[winner]
         if self._lives[receiver] <= 0:
-            self._sfx.play("applause")
-            self._start_flash(
-                color=winner_color,
-                count=self._pong.gameover_flash_count,
-                now_ms=now_ms,
-            )
-            self._state = "gameover_flash"
+            self._state = "game_over"
             return
         self._pending_server = receiver
         self._start_flash(
             color=winner_color,
+            side=winner,
             count=self._pong.point_flash_count,
             now_ms=now_ms,
         )
@@ -277,7 +284,7 @@ class PongManager:
         self._return_ball(self._to_player, judgement, now_ms)
 
     def _ball_head_index(self, now_ms: int) -> int:
-        if self._state in ("point_flash", "gameover_flash", "game_over"):
+        if self._state in ("point_flash", "game_over"):
             return self._index_of(self._from_player)
         return round(self._ball_position(now_ms))
 
@@ -301,9 +308,6 @@ class PongManager:
         if self._state == "point_flash":
             if now_ms >= self._flash_until_ms:
                 self._serve(self._pending_server, now_ms=now_ms)
-        elif self._state == "gameover_flash":
-            if now_ms >= self._flash_until_ms:
-                self._state = "game_over"
         elif self._state == "rally":
             if self._to_player in self._auto_players:
                 if not self._returned and self._overshoot(now_ms) >= 0:
@@ -327,13 +331,22 @@ class PongManager:
         return self._snapshot(now_ms)
 
     def _render(self, now_ms: int) -> None:
-        if self._state in ("point_flash", "gameover_flash"):
+        if self._state == "point_flash":
             color = (
                 scale_pixel(self._flash_color, self._pong.point_flash_intensity)
                 if self._flash_on(now_ms)
                 else OFF
             )
-            self._led_output.write_frame(build_flash_frame(self._strip_len, color))
+            self._led_output.write_frame(
+                build_half_flash_frame(
+                    strip_len=self._strip_len,
+                    color=color,
+                    side=self._flash_side,
+                ),
+            )
+            return
+
+        if self._state == "game_over":
             return
 
         feedback = tuple(
@@ -372,6 +385,41 @@ class PongManager:
             abandoned=self._abandoned,
         )
 
+    def _winner(self) -> PlayerId:
+        p1_points = self._pong.lives - self._lives[2]
+        p2_points = self._pong.lives - self._lives[1]
+        return 1 if p1_points >= p2_points else 2
+
+    def _run_end_sequence(self) -> None:
+        """Segment score reveal followed by full-strip winner applause."""
+        half_len = self._strip_len // 2
+        segment_len = max(1, half_len // self._pong.lives)
+        p1_points = self._pong.lives - self._lives[2]
+        p2_points = self._pong.lives - self._lives[1]
+        run_score_animation(
+            led_output=self._led_output,
+            sfx=self._sfx,
+            strip_len=self._strip_len,
+            p1_target=p1_points * segment_len,
+            p2_target=p2_points * segment_len,
+            step_ms=self._score_step_ms,
+            step_leds=segment_len,
+            sleep=self._sleep,
+        )
+        winner = self._winner()
+        winner_color = _PLAYER_COLORS[winner]
+        run_applause_animation(
+            led_output=self._led_output,
+            sfx=self._sfx,
+            on_frame=build_full_flash_frame(
+                strip_len=self._strip_len,
+                color=winner_color,
+            ),
+            count=self._pong.gameover_flash_count,
+            flash_ms=self._pong.flash_ms,
+            sleep=self._sleep,
+        )
+
     def run(self, *, max_duration_s: float | None = None) -> PongSnapshot:
         """Run the live loop until game over or an optional time limit."""
         tick_s = 1.0 / max(self._runtime.update_hz, 1)
@@ -386,4 +434,6 @@ class PongManager:
                 break
             time.sleep(tick_s)
             snapshot = self.tick()
+        if snapshot.game_over and not snapshot.abandoned:
+            self._run_end_sequence()
         return snapshot

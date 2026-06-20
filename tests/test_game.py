@@ -100,6 +100,8 @@ def _gameplay_config(*, duration_s: int = 60) -> GameplayConfig:
         score_perfect=3,
         score_good=1,
         score_step_ms=200,
+        applause_flash_count=10,
+        applause_flash_ms=150,
         empty_shutdown_s=5,
         sfx=_sfx_config(),
     )
@@ -257,7 +259,7 @@ def test_final_percentages_capped_at_100() -> None:
     game.tick()  # p2 perfect
 
     p1_pct, p2_pct = game.final_percentages()
-    assert p1_pct == 50   # 1 good of 2 notes -> 100*1/2
+    assert p1_pct == 17   # 1 good of 2 notes -> 100*1/(2*3)
     assert p2_pct == 100  # 1 perfect of 1 note -> capped at 100
 
 
