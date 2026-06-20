@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from toxic_game.engine.led_frames import CYAN, MAGENTA, OFF
+from toxic_game.engine.led_frames import CYAN, MAGENTA, OFF, PLAYER_COLORS
 from toxic_game.engine.score_animation import (
     build_half_flash_frame,
     build_score_frame,
@@ -65,6 +65,16 @@ def test_leds_to_light_rounds() -> None:
     assert leds_to_light(0, 10) == 0
     assert leds_to_light(50, 10) == 5
     assert leds_to_light(100, 10) == 10
+
+
+def test_build_score_frame_uses_canonical_player_colors() -> None:
+    frame = build_score_frame(strip_len=20, p1_leds=5, p2_leds=5)
+
+    for index in range(5):
+        assert frame.pixels[index] == PLAYER_COLORS[1]
+    for index in range(15, 20):
+        assert frame.pixels[index] == PLAYER_COLORS[2]
+    assert frame.pixels[5] == OFF
 
 
 def test_build_score_frame_fills_from_outside() -> None:

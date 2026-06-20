@@ -10,10 +10,9 @@ from typing import Literal
 
 from toxic_game.config import LedConfig
 from toxic_game.engine.led_frames import (
-    CYAN,
     GOLD,
-    MAGENTA,
     OFF,
+    PLAYER_COLORS,
     RED,
     RgbPixel,
     WHITE,
@@ -28,7 +27,6 @@ from toxic_game.hw.led_patterns import chase_pixels
 
 PlayerId = Literal[1, 2]
 
-PLAYER_COLORS: dict[PlayerId, RgbPixel] = {1: MAGENTA, 2: CYAN}
 PARKED_BALL_INTENSITY = 0.25
 
 

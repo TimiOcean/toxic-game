@@ -163,7 +163,6 @@ class ArcadeDispatcher:
             runtime=self._runtime,
             sfx=self._pong_sfx,
             empty_shutdown_ms=self._gameplay.empty_shutdown_s * 1000,
-            score_step_ms=self._gameplay.score_step_ms,
         )
         game.start()
         game.run()
@@ -181,6 +180,7 @@ class ArcadeDispatcher:
             led=self._led,
             runtime=self._runtime,
             empty_shutdown_ms=self._gameplay.empty_shutdown_s * 1000,
+            sfx=self._gameplay_sfx,
         )
         game.start(notes_p1=self._notes.player1, notes_p2=self._notes.player2)
         snapshot = game.run()

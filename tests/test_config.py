@@ -109,6 +109,7 @@ def test_pong_distance_and_flash_defaults(tmp_path: Path) -> None:
     assert config.pong.point_flash_intensity == 0.15
     assert config.pong.gameover_flash_count == 10
     assert config.pong.flash_ms == 150
+    assert config.pong.score_step_ms == 750
 
 
 def test_gameplay_score_defaults(tmp_path: Path) -> None:
@@ -149,6 +150,23 @@ chime = "sfx/chime.wav"
     config = load_app_config(config_path)
 
     assert config.gameplay.sfx.chime == (tmp_path / "sfx" / "chime.wav").resolve()
+
+
+def test_gameplay_sfx_perfect_path_resolved_relative_to_config(tmp_path: Path) -> None:
+    config_path = tmp_path / "cfg.toml"
+    config_path.write_text(
+        """
+[gameplay.sfx]
+perfect = "sfx/perfect_rythm.mp3"
+""",
+        encoding="utf-8",
+    )
+
+    config = load_app_config(config_path)
+
+    assert config.gameplay.sfx.perfect == (
+        tmp_path / "sfx" / "perfect_rythm.mp3"
+    ).resolve()
 
 
 def test_invalid_pong_distance_order_rejected(tmp_path: Path) -> None:

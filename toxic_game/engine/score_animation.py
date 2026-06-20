@@ -12,10 +12,9 @@ from collections.abc import Callable
 from typing import Literal
 
 from toxic_game.engine.led_frames import (
-    CYAN,
-    MAGENTA,
     LedFrame,
     OFF,
+    PLAYER_COLORS,
     RgbPixel,
     blank_pixels,
     build_frame,
@@ -51,12 +50,13 @@ def leds_to_light(pct: int, half_len: int) -> int:
 
 
 def build_score_frame(*, strip_len: int, p1_leds: int, p2_leds: int) -> LedFrame:
-    """Fill the left half magenta and the right half cyan from the outside in."""
+    """Fill each half from the outside in using canonical player colors."""
+    half_len = strip_len // 2
     pixels = blank_pixels(strip_len)
-    for offset in range(min(p1_leds, strip_len)):
-        pixels[offset] = MAGENTA
-    for offset in range(min(p2_leds, strip_len)):
-        pixels[strip_len - 1 - offset] = CYAN
+    for offset in range(min(p1_leds, half_len)):
+        pixels[offset] = PLAYER_COLORS[1]
+    for offset in range(min(p2_leds, half_len)):
+        pixels[strip_len - 1 - offset] = PLAYER_COLORS[2]
     return build_frame(pixels)
 
 

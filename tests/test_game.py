@@ -17,6 +17,7 @@ from toxic_game.engine.game import GameManager
 from toxic_game.engine.notes import ResolvedNote
 from toxic_game.engine.presence import HeldStates
 from toxic_game.hw.led_output import SimLedOutput
+from toxic_game.hw.sfx import RecordingSfxPlayer
 
 
 @dataclass
@@ -169,6 +170,26 @@ def test_tick_scores_presses_and_misses() -> None:
     assert snapshot.pending_p1 == 0
     assert snapshot.pending_p2 == 0
     assert len(led.frames) == 4
+
+
+def test_perfect_hit_plays_perfect_sfx() -> None:
+    song = ScriptedSongManager()
+    buttons = ScriptedButtons([ButtonPresses(p1=True, p2=False)])
+    sfx = RecordingSfxPlayer()
+    game = GameManager(
+        song_manager=song,  # type: ignore[arg-type]
+        button_manager=buttons,  # type: ignore[arg-type]
+        led_output=SimLedOutput(),
+        gameplay=_gameplay_config(),
+        led=_led_config(),
+        runtime=RuntimeConfig(update_hz=60),
+        sfx=sfx,
+    )
+    game.start(notes_p1=(_note(player=1, hit_ms=1000),), notes_p2=())
+    song.position_ms = 1000
+    game.tick()
+
+    assert sfx.events == ["perfect"]
 
 
 def test_ghost_tap_is_ignored_in_game_loop() -> None:

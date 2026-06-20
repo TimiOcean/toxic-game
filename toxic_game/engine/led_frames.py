@@ -15,6 +15,9 @@ YELLOW: RgbPixel = (255, 255, 0)
 GOLD: RgbPixel = (200, 140, 0)
 GREY_WHITE: RgbPixel = (150, 150, 150)
 
+# Canonical player colors — use everywhere (gameplay, score reveal, applause).
+PLAYER_COLORS: dict[int, RgbPixel] = {1: MAGENTA, 2: CYAN}
+
 NAMED_COLORS: dict[str, RgbPixel] = {
     "off": OFF,
     "red": RED,

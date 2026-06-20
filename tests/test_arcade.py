@@ -79,6 +79,7 @@ def _pong_config() -> PongConfig:
         point_flash_intensity=0.15,
         gameover_flash_count=10,
         flash_ms=150,
+        score_step_ms=750,
         sfx=_sfx_config(),
     )
 

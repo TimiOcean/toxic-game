@@ -21,6 +21,7 @@ from toxic_game.engine.score_animation import score_percentage
 from toxic_game.engine.scoring import Judgement, evaluate_press, pop_missed_notes
 from toxic_game.engine.song_manager import SongManager
 from toxic_game.hw.led_output import LedOutput
+from toxic_game.hw.sfx import NoOpSfxPlayer, SfxPlayer
 
 
 class ButtonPoller(Protocol):
@@ -63,6 +64,7 @@ class GameManager:
         runtime: RuntimeConfig,
         solo_mode: bool = False,
         empty_shutdown_ms: int = 5000,
+        sfx: SfxPlayer | None = None,
         clock_ms: Callable[[], int] | None = None,
     ) -> None:
         self._song_manager = song_manager
@@ -72,6 +74,7 @@ class GameManager:
         self._led = led
         self._runtime = runtime
         self._solo_mode = solo_mode
+        self._sfx = sfx or NoOpSfxPlayer()
         self._clock_ms = clock_ms or (lambda: int(time.monotonic() * 1000))
 
         self._pending_p1: tuple[ResolvedNote, ...] = ()
@@ -183,6 +186,8 @@ class GameManager:
                 started_ms=press_ms,
             )
             self._apply_judgement(result.judgement, player=player)
+            if result.judgement == Judgement.PERFECT:
+                self._sfx.play("perfect")
 
     def _snapshot(self, now_ms: int) -> GameSnapshot:
         return GameSnapshot(

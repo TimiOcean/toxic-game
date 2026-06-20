@@ -75,6 +75,7 @@ def _pong_config(**overrides: object) -> PongConfig:
         "point_flash_intensity": 0.15,
         "gameover_flash_count": 2,
         "flash_ms": 10,
+        "score_step_ms": 10,
         "sfx": _sfx_config(),
     }
     defaults.update(overrides)

@@ -16,7 +16,7 @@ from typing import Literal, Protocol
 
 from toxic_game.config import JudgementWindowsMs, LedConfig, PongConfig, RuntimeConfig
 from toxic_game.engine.button_manager import ButtonManager, ButtonPresses
-from toxic_game.engine.led_frames import CYAN, MAGENTA, OFF, RgbPixel, WHITE, scale_pixel
+from toxic_game.engine.led_frames import OFF, PLAYER_COLORS, RgbPixel, WHITE
 from toxic_game.engine.presence import EmptyShutdownTracker, HeldStates
 from toxic_game.engine.pong_led import (
     ball_index_for_player,
@@ -35,8 +35,6 @@ from toxic_game.hw.sfx import NoOpSfxPlayer, SfxPlayer
 PlayerId = Literal[1, 2]
 
 PongState = Literal["rally", "point_flash", "game_over"]
-
-_PLAYER_COLORS: dict[PlayerId, RgbPixel] = {1: MAGENTA, 2: CYAN}
 
 
 class ButtonPoller(Protocol):
@@ -95,7 +93,6 @@ class PongManager:
         sfx: SfxPlayer | None = None,
         auto_players: frozenset[PlayerId] = frozenset(),
         empty_shutdown_ms: int = 5000,
-        score_step_ms: int = 200,
         clock_ms: Callable[[], int] | None = None,
         sleep: Callable[[float], None] | None = None,
         rng: Callable[[], float] | None = None,
@@ -108,7 +105,6 @@ class PongManager:
         self._runtime = runtime
         self._sfx = sfx or NoOpSfxPlayer()
         self._auto_players = auto_players
-        self._score_step_ms = score_step_ms
         self._clock_ms = clock_ms or (lambda: int(time.monotonic() * 1000))
         self._sleep = sleep or time.sleep
         self._rng = rng or random.random
@@ -214,7 +210,7 @@ class PongManager:
         judgement: Judgement,
         now_ms: int,
     ) -> None:
-        self._ball_color = _PLAYER_COLORS[receiver]
+        self._ball_color = PLAYER_COLORS[receiver]
         self._speed_level *= self._pong.continuous_multiplier
         self._perfect_active = judgement == Judgement.PERFECT
         self._rally_count += 1
@@ -250,7 +246,7 @@ class PongManager:
         self._sfx.play("miss")
         self._returned = True
         winner = _other(receiver)
-        winner_color = _PLAYER_COLORS[winner]
+        winner_color = PLAYER_COLORS[winner]
         if self._lives[receiver] <= 0:
             self._state = "game_over"
             return
@@ -332,11 +328,7 @@ class PongManager:
 
     def _render(self, now_ms: int) -> None:
         if self._state == "point_flash":
-            color = (
-                scale_pixel(self._flash_color, self._pong.point_flash_intensity)
-                if self._flash_on(now_ms)
-                else OFF
-            )
+            color = self._flash_color if self._flash_on(now_ms) else OFF
             self._led_output.write_frame(
                 build_half_flash_frame(
                     strip_len=self._strip_len,
@@ -347,6 +339,9 @@ class PongManager:
             return
 
         if self._state == "game_over":
+            self._led_output.write_frame(
+                build_full_flash_frame(strip_len=self._strip_len, color=OFF),
+            )
             return
 
         feedback = tuple(
@@ -402,12 +397,12 @@ class PongManager:
             strip_len=self._strip_len,
             p1_target=p1_points * segment_len,
             p2_target=p2_points * segment_len,
-            step_ms=self._score_step_ms,
+            step_ms=self._pong.score_step_ms,
             step_leds=segment_len,
             sleep=self._sleep,
         )
         winner = self._winner()
-        winner_color = _PLAYER_COLORS[winner]
+        winner_color = PLAYER_COLORS[winner]
         run_applause_animation(
             led_output=self._led_output,
             sfx=self._sfx,

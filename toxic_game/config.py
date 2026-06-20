@@ -176,6 +176,7 @@ class PongConfig:
     point_flash_intensity: float
     gameover_flash_count: int
     flash_ms: int
+    score_step_ms: int
     sfx: SfxConfig
 
 
@@ -393,6 +394,7 @@ def _build_pong_config(
     point_flash_intensity = _read_float(pong_table, "point_flash_intensity", 0.15)
     gameover_flash_count = _read_int(pong_table, "gameover_flash_count", 10)
     flash_ms = _read_int(pong_table, "flash_ms", 150)
+    score_step_ms = _read_int(pong_table, "score_step_ms", 750)
 
     if base_travel_ms < 1:
         message = "pong base_travel_ms must be >= 1"
@@ -427,6 +429,9 @@ def _build_pong_config(
     if flash_ms < 1:
         message = "pong flash_ms must be >= 1"
         raise ValueError(message)
+    if score_step_ms < 1:
+        message = "pong score_step_ms must be >= 1"
+        raise ValueError(message)
 
     sfx = _build_sfx_config(config_dir, _read_toml_table(pong_table, "sfx"))
 
@@ -444,6 +449,7 @@ def _build_pong_config(
         point_flash_intensity=point_flash_intensity,
         gameover_flash_count=gameover_flash_count,
         flash_ms=flash_ms,
+        score_step_ms=score_step_ms,
         sfx=sfx,
     )
 

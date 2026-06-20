@@ -92,6 +92,7 @@ def run_game_check(
             led_config,
             running_light_spawn=SEPARATED_LIGHTS_SPAWN,  # type: ignore[arg-type]
         )
+    sfx = NoOpSfxPlayer() if mute else build_sfx_player(gameplay_config.sfx)
     game = GameManager(
         song_manager=song_manager,
         button_manager=ButtonManager(),
@@ -100,6 +101,7 @@ def run_game_check(
         led=led_config,
         runtime=build_runtime_config(),
         solo_mode=solo_mode,
+        sfx=sfx,
     )
     game.start(notes_p1=notes.player1, notes_p2=notes.player2, start_ms=start_ms)
     snapshot = game.run(max_duration_s=duration_s)
@@ -121,7 +123,6 @@ def run_game_check(
         ),
     )
 
-    sfx = NoOpSfxPlayer() if mute else build_sfx_player(gameplay_config.sfx)
     half_len = led_config.active_count // 2
     run_score_animation(
         led_output=led_output,

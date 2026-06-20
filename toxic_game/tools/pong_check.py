@@ -58,7 +58,6 @@ def run_pong_check(
         runtime=build_runtime_config(),
         sfx=sfx,
         auto_players=auto_players,
-        score_step_ms=app.gameplay.score_step_ms,
     )
     game.start()
     snapshot = game.run(max_duration_s=duration_s)
